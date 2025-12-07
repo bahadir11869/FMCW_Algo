@@ -3,21 +3,35 @@
 #include <omp.h>
 
 
+Recursive_FFT_OpenMP::Recursive_FFT_OpenMP()
+{
+    cudaEventCreate(&start); 
+    cudaEventCreate(&stop);
+    cufftPlan1d(&planRange, NUM_SAMPLES, CUFFT_C2C, NUM_CHIRPS);
+    cufftPlan1d(&planDoppler, NUM_CHIRPS, CUFFT_C2C, NUM_SAMPLES);
+    gpuErrchk(cudaMalloc(&d_data, TOTAL_SIZE * sizeof(cuComplex))); 
+    gpuErrchk(cudaMalloc(&d_transposed, TOTAL_SIZE * sizeof(cuComplex)));
 
-void Recursive_FFT_OpenMP::run_gpu_pipeline(const std::vector<Complex> h_input, std::vector<Complex>& h_output)
+}
+Recursive_FFT_OpenMP::~Recursive_FFT_OpenMP()
+{
+    cufftDestroy(planRange); 
+    cufftDestroy(planDoppler);
+    cudaFree(d_data);
+    cudaFree(d_transposed);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+}
+
+
+void Recursive_FFT_OpenMP::run_gpu_pipeline(const std::vector<Complex>& h_input, std::vector<Complex>& h_output)
 {
     size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
     h_output.resize(TOTAL_SIZE);
-    cudaEvent_t start, stop; cudaEventCreate(&start); cudaEventCreate(&stop);
-    cuComplex *d_data, *d_transposed;
-    gpuErrchk(cudaMalloc(&d_data, sizeBytes)); gpuErrchk(cudaMalloc(&d_transposed, sizeBytes));
+    
+    cudaEventRecord(start);
     gpuErrchk(cudaMemcpy(d_data, h_input.data(), sizeBytes, cudaMemcpyHostToDevice));
     
-    cufftHandle planRange, planDoppler;
-    cufftPlan1d(&planRange, NUM_SAMPLES, CUFFT_C2C, NUM_CHIRPS);
-    cufftPlan1d(&planDoppler, NUM_CHIRPS, CUFFT_C2C, NUM_SAMPLES);
-
-    cudaEventRecord(start);
     cufftExecC2C(planRange, d_data, d_data, CUFFT_FORWARD);
     dim3 threads(TILE_DIM, TILE_DIM);
     dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
@@ -28,7 +42,6 @@ void Recursive_FFT_OpenMP::run_gpu_pipeline(const std::vector<Complex> h_input, 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&gpuTime, start, stop);
-    cufftDestroy(planRange); cufftDestroy(planDoppler); cudaFree(d_data); cudaFree(d_transposed);
 }
 
 void Recursive_FFT_OpenMP::cpu_recursive_fft(std::vector<Complex>& a) {
@@ -43,7 +56,7 @@ void Recursive_FFT_OpenMP::cpu_recursive_fft(std::vector<Complex>& a) {
     }
 }
 
-void Recursive_FFT_OpenMP::run_cpu_pipeline(const std::vector<Complex> input, std::vector<Complex>& output)
+void Recursive_FFT_OpenMP::run_cpu_pipeline(const std::vector<Complex>& input, std::vector<Complex>& output)
 {
     std::vector<Complex> data = input;
     output.resize(TOTAL_SIZE);

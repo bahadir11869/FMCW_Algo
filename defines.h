@@ -10,6 +10,9 @@
 #include <cuComplex.h>
 #include <cstdio> // Dosya islemleri icin
 #include <thread> // Sleep için gerekli
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 const int NUM_CHIRPS = 2048;      // Slow Time (Y)
 const int NUM_SAMPLES = 1024;     // Fast Time (X)
@@ -85,18 +88,14 @@ inline void veriUret( std::vector<Complex>& inputData, std::vector<stTarget>targ
     }
 }
 
-inline void dosyayaYaz(std::string sDosyaIsmi, float fOrtCpuSuresi, float fOrtGpuSuresi, std::vector<Complex> vResult, std::vector<stTarget> targets, float threshold, bool b2DFFTMi = false)
+inline void dosyayaYaz(const char* cpDosyaIsmi, float fOrtCpuSuresi, float fOrtGpuSuresi, std::vector<Complex> vResult, std::vector<stTarget> targets, float threshold, bool b2DFFTMi = false)
 {
-
-    std::string sDosyaUzantisi = ".txt";
-    std::string sYeniDosyaIsmi = sDosyaIsmi + sDosyaUzantisi;
-    FILE* fp = fopen(sYeniDosyaIsmi.c_str(), "w");
+    FILE* fp = fopen(cpDosyaIsmi, "w");
     if (fp == NULL) 
     {
         std::cerr << "Dosya acilamadi!" << std::endl;
         return;
     }
-    std::cout << "\n=== SONUC OZETI ===" << std::endl;
     fprintf(fp,"CPU Sure: %.2f ms\n", fOrtCpuSuresi);
     fprintf(fp, "GPU Sure: %.2f ms\n", fOrtGpuSuresi);
     fprintf(fp, "SpeedUp: %.2fx\n", fOrtCpuSuresi/fOrtGpuSuresi);
@@ -250,7 +249,5 @@ inline void dosyayaYaz(std::string sDosyaIsmi, float fOrtCpuSuresi, float fOrtGp
     
     fprintf(fp, "----------------------------------------------------------------------------------------------------\n");
     fclose(fp); // Dosyayı kapatmayı unutma!
-
-    std::cout << "Islem tamamlandi."<<sYeniDosyaIsmi <<" dosyasini kontrol edin." << std::endl;
 
 }

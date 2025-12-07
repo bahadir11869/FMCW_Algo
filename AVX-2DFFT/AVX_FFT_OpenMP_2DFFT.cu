@@ -4,19 +4,24 @@
 
 AVX_FFT_OpenMP_2DFFT::AVX_FFT_OpenMP_2DFFT()
 {
-    printf("AVX_FFT_OpenMP_2DFFT \n");
+    //printf("AVX_FFT_OpenMP_2DFFT \n");
     gpuErrchk(cudaMalloc(&d_data, TOTAL_SIZE * sizeof(cuComplex)));
     if (cufftPlan2d(&plan, NUM_CHIRPS, NUM_SAMPLES, CUFFT_C2C) != CUFFT_SUCCESS) 
     {
         std::cerr << "CUFFT Plan Hatasi!" << std::endl;
         exit(1);    
     }
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 }
 
 AVX_FFT_OpenMP_2DFFT::~AVX_FFT_OpenMP_2DFFT()
 {
     cudaFree(d_data);
     cufftDestroy(plan);
+    
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 }
 
 
@@ -24,9 +29,6 @@ void AVX_FFT_OpenMP_2DFFT::run_gpu_pipeline(Complex* h_input, Complex* h_output)
 {
     size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
 
     // --- KRITIK BOLGE BASLANGIC ---
     cudaEventRecord(start);
@@ -46,9 +48,6 @@ void AVX_FFT_OpenMP_2DFFT::run_gpu_pipeline(Complex* h_input, Complex* h_output)
 
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&gpuTime, start, stop);
-
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
 }
 
 void AVX_FFT_OpenMP_2DFFT::run_cpu_pipeline(Complex* input, Complex* output)

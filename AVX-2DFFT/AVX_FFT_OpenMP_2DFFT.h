@@ -18,5 +18,6 @@ class AVX_FFT_OpenMP_2DFFT
         float cpuTime, gpuTime;
         cuComplex* d_data;
         cufftHandle plan;
+        cudaEvent_t start, stop;
 
 }; 
