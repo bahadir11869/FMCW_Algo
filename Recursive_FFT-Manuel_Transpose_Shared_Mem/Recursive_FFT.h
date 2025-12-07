@@ -7,6 +7,7 @@ class Recursive_FFT
     public:
         void run_gpu_pipeline(const std::vector<Complex> h_input, std::vector<Complex>& h_output);
         void run_cpu_pipeline(const std::vector<Complex> input, std::vector<Complex>& output);
+        ~Recursive_FFT();
         float getCpuTime();
         float getGPUTime();
         std::vector<Complex> getCpuResult();

@@ -1,6 +1,6 @@
-CPU Sure: 482.71 ms
-GPU Sure: 7.56 ms
-SpeedUp: 63.87x
+CPU Sure: 502.77 ms
+GPU Sure: 2.58 ms
+SpeedUp: 195.14x
 === RADAR ANALIZ RAPORU ===
 Resolution    : Range = 1.0000 m | Velocity = 0.0190 m/s
 --- HEDEF TESPIT TABLOSU ---

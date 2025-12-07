@@ -12,13 +12,10 @@ std::vector<stTarget> s1 = {
         {3, 20.0f,   5.0f, 0.8f}
         };
 
+
+
 int main()
 {
-    Recursive_FFT RecursiveFFT_ManuelTranspose;
-    Recursive_FFT_OpenMP RecursiveFFT_ManuelTranspose_OpenMP;
-    AVX_FFT_OpenMP AVX_FFT_OpenMP_ManuelTranspose;
-    AVX_FFT_OpenMP_2DFFT AVX_FFT_OpenMP_OtoTranspose;
-    
     std::vector<Complex> inputData(TOTAL_SIZE);
     std::vector<Complex> outputDataCpu(TOTAL_SIZE);
     std::vector<Complex> outputDataGpu(TOTAL_SIZE);
@@ -27,105 +24,129 @@ int main()
     float fCpuTime = 0.0;
     float fGpuTime = 0.0;
 
-    // Recursive_FFT-Manuel_Transpose_Shared_Mem
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        RecursiveFFT_ManuelTranspose.run_cpu_pipeline(inputData, outputDataCpu);
-        fCpuTime += RecursiveFFT_ManuelTranspose.getCpuTime();
-    }
+    /*
+    {      // Recursive_FFT-Manuel_Transpose_Shared_Mem
+        Recursive_FFT RecursiveFFT_ManuelTranspose;
+    
+        for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            RecursiveFFT_ManuelTranspose.run_cpu_pipeline(inputData, outputDataCpu);
+            fCpuTime += RecursiveFFT_ManuelTranspose.getCpuTime();
+        }
 
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        gpuErrchk(cudaDeviceSynchronize());
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        RecursiveFFT_ManuelTranspose.run_gpu_pipeline(inputData, outputDataGpu);
-        fGpuTime += RecursiveFFT_ManuelTranspose.getGPUTime();
+        for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            gpuErrchk(cudaDeviceSynchronize());
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            RecursiveFFT_ManuelTranspose.run_gpu_pipeline(inputData, outputDataGpu);
+            fGpuTime += RecursiveFFT_ManuelTranspose.getGPUTime();
+        }
+        
+        dosyayaYaz("Recursive_FFT-Manuel_Transpose_Shared_Mem/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0);
+        dosyayaYaz("Recursive_FFT-Manuel_Transpose_Shared_Mem/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0);
+
+        printf("Recursive_FFT-Manuel_Transpose_Shared_Mem ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
     }
     
-    dosyayaYaz("Recursive_FFT-Manuel_Transpose_Shared_Mem/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0);
-    dosyayaYaz("Recursive_FFT-Manuel_Transpose_Shared_Mem/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0);
+    {    // OpenMP-Manuel_Transpose_Shared_Mem
+        Recursive_FFT_OpenMP RecursiveFFT_ManuelTranspose_OpenMP;
+        for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            RecursiveFFT_ManuelTranspose_OpenMP.run_cpu_pipeline(inputData, outputDataCpu);
+            fCpuTime += RecursiveFFT_ManuelTranspose_OpenMP.getCpuTime();
+        }
 
-    printf("ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
-    fCpuTime = 0.0;
-    fGpuTime = 0.0;
+        for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            gpuErrchk(cudaDeviceSynchronize());
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            RecursiveFFT_ManuelTranspose_OpenMP.run_gpu_pipeline(inputData, outputDataGpu);
+            fGpuTime += RecursiveFFT_ManuelTranspose_OpenMP.getGPUTime();
+        }
+        
+        dosyayaYaz("OpenMP-Manuel_Transpose_Shared_Mem/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0);
+        dosyayaYaz("OpenMP-Manuel_Transpose_Shared_Mem/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0);
 
-    // OpenMP-Manuel_Transpose_Shared_Mem
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        RecursiveFFT_ManuelTranspose_OpenMP.run_cpu_pipeline(inputData, outputDataCpu);
-        fCpuTime += RecursiveFFT_ManuelTranspose_OpenMP.getCpuTime();
+        printf("OpenMP-Manuel_Transpose_Shared_Mem ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
+    }
+    */
+    { // AVX_FFT_OpenMP_ManuelTranspose
+        AVX_FFT_OpenMP AVX_FFT_OpenMP_ManuelTranspose;
+         for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            AVX_FFT_OpenMP_ManuelTranspose.run_cpu_pipeline(inputData, outputDataCpu);
+            fCpuTime += AVX_FFT_OpenMP_ManuelTranspose.getCpuTime();
+        }
+
+        for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            gpuErrchk(cudaDeviceSynchronize());
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            AVX_FFT_OpenMP_ManuelTranspose.run_gpu_pipeline(inputData, outputDataGpu);
+            fGpuTime += AVX_FFT_OpenMP_ManuelTranspose.getGPUTime();
+        }
+        
+        dosyayaYaz("AVX-Manuel_Transpose_Shared_Mem/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0);
+        dosyayaYaz("AVX-Manuel_Transpose_Shared_Mem/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0);
+
+        printf("AVX_FFT_OpenMP_ManuelTranspose ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
     }
 
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        gpuErrchk(cudaDeviceSynchronize());
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        RecursiveFFT_ManuelTranspose_OpenMP.run_gpu_pipeline(inputData, outputDataGpu);
-        fGpuTime += RecursiveFFT_ManuelTranspose_OpenMP.getGPUTime();
+    {     // AVX-2DFFT
+        AVX_FFT_OpenMP_2DFFT AVX_FFT_OpenMP_OtoTranspose;
+        Complex *h_pinned_input, *h_pinned_outputGPU, *h_pinned_outputCPU;
+        gpuErrchk(cudaMallocHost((void**)&h_pinned_input, TOTAL_SIZE * sizeof(Complex)));
+        gpuErrchk(cudaMallocHost((void**)&h_pinned_outputCPU, TOTAL_SIZE * sizeof(Complex)));
+        gpuErrchk(cudaMallocHost((void**)&h_pinned_outputGPU, TOTAL_SIZE * sizeof(Complex)));
+        memcpy(h_pinned_input, inputData.data(), TOTAL_SIZE* sizeof(Complex));
+        for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            AVX_FFT_OpenMP_OtoTranspose.run_cpu_pipeline(h_pinned_input, h_pinned_outputCPU);
+            fCpuTime += AVX_FFT_OpenMP_OtoTranspose.getCpuTime();
+        }
+
+        for(int i = 0; i <iTekrarSayisi; i++)
+        {
+            gpuErrchk(cudaDeviceSynchronize());
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            AVX_FFT_OpenMP_OtoTranspose.run_gpu_pipeline(h_pinned_input, h_pinned_outputGPU);
+            fGpuTime += AVX_FFT_OpenMP_OtoTranspose.getGPUTime();
+        }
+        
+        memcpy(outputDataGpu.data(), h_pinned_outputGPU, sizeof(Complex) * TOTAL_SIZE);
+        memcpy(outputDataCpu.data(), h_pinned_outputCPU, sizeof(Complex) * TOTAL_SIZE);
+        dosyayaYaz("AVX-2DFFT/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0, false);
+        dosyayaYaz("AVX-2DFFT/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0, true);
+
+        printf("AVX-2DFFT ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
+        cudaFreeHost(h_pinned_input);
+        cudaFreeHost(h_pinned_outputCPU);
+        cudaFreeHost(h_pinned_outputGPU);
     }
+
+
     
-    dosyayaYaz("OpenMP-Manuel_Transpose_Shared_Mem/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0);
-    dosyayaYaz("OpenMP-Manuel_Transpose_Shared_Mem/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0);
 
-    printf("ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
-    gpuErrchk(cudaDeviceSynchronize());
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+
+   
+   
+    
     fCpuTime = 0.0;
     fGpuTime = 0.0;
     // AVX-Manuel_Transpose_Shared_Mem
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        AVX_FFT_OpenMP_ManuelTranspose.run_cpu_pipeline(inputData, outputDataCpu);
-        fCpuTime += AVX_FFT_OpenMP_ManuelTranspose.getCpuTime();
-    }
-
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        gpuErrchk(cudaDeviceSynchronize());
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        AVX_FFT_OpenMP_ManuelTranspose.run_gpu_pipeline(inputData, outputDataGpu);
-        fGpuTime += AVX_FFT_OpenMP_ManuelTranspose.getGPUTime();
-    }
-    
-    dosyayaYaz("AVX-Manuel_Transpose_Shared_Mem/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0);
-    dosyayaYaz("AVX-Manuel_Transpose_Shared_Mem/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0);
-
-    printf("ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
+   
     gpuErrchk(cudaDeviceSynchronize());
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     fCpuTime = 0.0;
     fGpuTime = 0.0;
 
-    // AVX-2DFFT
-    Complex *h_pinned_input, *h_pinned_outputGPU, *h_pinned_outputCPU;
-    gpuErrchk(cudaMallocHost((void**)&h_pinned_input, TOTAL_SIZE * sizeof(Complex)));
-    gpuErrchk(cudaMallocHost((void**)&h_pinned_outputCPU, TOTAL_SIZE * sizeof(Complex)));
-    gpuErrchk(cudaMallocHost((void**)&h_pinned_outputGPU, TOTAL_SIZE * sizeof(Complex)));
-    memcpy(h_pinned_input, inputData.data(), TOTAL_SIZE* sizeof(Complex));
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        AVX_FFT_OpenMP_OtoTranspose.run_cpu_pipeline(h_pinned_input, h_pinned_outputCPU);
-        fCpuTime += AVX_FFT_OpenMP_OtoTranspose.getCpuTime();
-    }
-
-    for(int i = 0; i <iTekrarSayisi; i++)
-    {
-        gpuErrchk(cudaDeviceSynchronize());
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
-        AVX_FFT_OpenMP_OtoTranspose.run_gpu_pipeline(h_pinned_input, h_pinned_outputGPU);
-        fGpuTime += AVX_FFT_OpenMP_OtoTranspose.getGPUTime();
-    }
-    
-    memcpy(outputDataGpu.data(), h_pinned_outputGPU, sizeof(Complex) * TOTAL_SIZE);
-    memcpy(outputDataCpu.data(), h_pinned_outputCPU, sizeof(Complex) * TOTAL_SIZE);
-    dosyayaYaz("AVX-2DFFT/cpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpu, s1, 100.0, false);
-    dosyayaYaz("AVX-2DFFT/gpu", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu, s1, 100.0, true);
-
-    printf("ortalama cpu suresi : %f ms ortalama gpu suresi %f ms\n", fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi);
+  
+   
 
     return 0;
 }

@@ -3,19 +3,25 @@
 #include <omp.h>
 #include <mkl.h> // Intel MKL başlık dosyası
 
+AVX_FFT_OpenMP::AVX_FFT_OpenMP()
+{
+    cufftPlan1d(&planRange, NUM_SAMPLES, CUFFT_C2C, NUM_CHIRPS);
+    cufftPlan1d(&planDoppler, NUM_CHIRPS, CUFFT_C2C, NUM_SAMPLES);
+    gpuErrchk(cudaMalloc(&d_data, TOTAL_SIZE * sizeof(cuComplex))); gpuErrchk(cudaMalloc(&d_transposed, TOTAL_SIZE * sizeof(cuComplex)));
+}
+
+AVX_FFT_OpenMP::~AVX_FFT_OpenMP()
+{
+    cufftDestroy(planRange); cufftDestroy(planDoppler); cudaFree(d_data); cudaFree(d_transposed);
+}
+
 
 void AVX_FFT_OpenMP::run_gpu_pipeline(const std::vector<Complex> h_input, std::vector<Complex>& h_output)
 {
     size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
     h_output.resize(TOTAL_SIZE);
     cudaEvent_t start, stop; cudaEventCreate(&start); cudaEventCreate(&stop);
-    cuComplex *d_data, *d_transposed;
-    gpuErrchk(cudaMalloc(&d_data, sizeBytes)); gpuErrchk(cudaMalloc(&d_transposed, sizeBytes));
     gpuErrchk(cudaMemcpy(d_data, h_input.data(), sizeBytes, cudaMemcpyHostToDevice));
-    
-    cufftHandle planRange, planDoppler;
-    cufftPlan1d(&planRange, NUM_SAMPLES, CUFFT_C2C, NUM_CHIRPS);
-    cufftPlan1d(&planDoppler, NUM_CHIRPS, CUFFT_C2C, NUM_SAMPLES);
 
     cudaEventRecord(start);
     cufftExecC2C(planRange, d_data, d_data, CUFFT_FORWARD);
@@ -28,7 +34,7 @@ void AVX_FFT_OpenMP::run_gpu_pipeline(const std::vector<Complex> h_input, std::v
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&gpuTime, start, stop);
-    cufftDestroy(planRange); cufftDestroy(planDoppler); cudaFree(d_data); cudaFree(d_transposed);
+   
 }
 
 void AVX_FFT_OpenMP::run_cpu_pipeline(const std::vector<Complex> input, std::vector<Complex>& output)

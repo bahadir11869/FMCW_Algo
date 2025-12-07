@@ -10,9 +10,13 @@ class AVX_FFT_OpenMP
         float getGPUTime();
         std::vector<Complex> getCpuResult();
         std::vector<Complex> getGpuResult();
+        AVX_FFT_OpenMP();
+        ~AVX_FFT_OpenMP();
 
     private:        
         std::vector<Complex> cpuResult, gpuResult;
         float cpuTime, gpuTime;
+        cufftHandle planRange, planDoppler;
+        cuComplex *d_data, *d_transposed;
 
 }; 
