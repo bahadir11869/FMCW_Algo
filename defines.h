@@ -11,6 +11,7 @@
 #include <cstdio> // Dosya islemleri icin
 #include <thread> // Sleep için gerekli
 #include <filesystem>
+#include <math.h>
 
 namespace fs = std::filesystem;
 
@@ -25,7 +26,7 @@ const float FC = 77e9f;
 const float BANDWIDTH = 150e6f;
 const float CHIRP_DURATION = 50e-6f;
 const float SLOPE = BANDWIDTH / CHIRP_DURATION;
-const float PI = 3.14159265359f;
+#define PI  3.14159265359f
 
 const float range_res = C / (2.0f * BANDWIDTH);
 const float wavelength = C / FC;
@@ -49,14 +50,6 @@ struct stTarget {
     float range;    // m
     float velocity; // m/s
     float amplitude;// 0.0 - 1.0
-};
-
-struct stFFTEq
-{
-    float range_res;
-    float wavelength;
-    float frame_duration;
-    float velocity_res;
 };
 
 
@@ -120,7 +113,7 @@ inline void dosyayaYaz(const char* cpDosyaIsmi, float fOrtCpuSuresi, float fOrtG
                     float prev = std::abs(vResult[(r - 1) * NUM_CHIRPS + v]);
                     float next = std::abs(vResult[(r + 1) * NUM_CHIRPS + v]);
 
-                    if (amp > prev && amp > next) // Lokal maks
+                    if (amp >= prev && amp > next) // Lokal maks
                     {
                         detected_count++;
                         
@@ -188,7 +181,7 @@ inline void dosyayaYaz(const char* cpDosyaIsmi, float fOrtCpuSuresi, float fOrtG
                     float prev = std::abs(vResult[prev_idx]);
                     float next = std::abs(vResult[next_idx]);
 
-                    if (amp > prev && amp > next) {
+                    if (amp >= prev && amp > next) {
                         detected_count++;
                         
                         // --- Fiziksel Değer Hesaplama ---

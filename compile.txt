@@ -1,3 +1,4 @@
+Recursive_FFT-Manuel_FFT/Recursive_FFT_ManuelFFT.cu
 Recursive_FFT-Manuel_Transpose_Shared_Mem/Recursive_FFT.cu
 OpenMP-Manuel_Transpose_Shared_Mem/Recursive_FFT_OMP.cu
 AVX-Manuel_Transpose_Shared_Mem/AVX_FFT_OMP.cu
