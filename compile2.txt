@@ -3,9 +3,8 @@ GPU_FMCW/gpu_fmcw.cu
 KERNEL_FMCW/kernels.cu
 -lcufft
 -Xcompiler "/openmp"
--I "C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"
--L "C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"
--L "C:\Program Files (x86)\Intel\oneAPI\compiler\latest\lib"
+-I "deps/mkl/include"
+-L "deps/mkl/lib"
 -lmkl_intel_lp64
 -lmkl_intel_thread
 -lmkl_core
