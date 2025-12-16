@@ -52,6 +52,54 @@ struct stTarget {
     float amplitude;// 0.0 - 1.0
 };
 
+template <typename T>
+inline void calculate_RMSE_Vectors(const std::vector<T>& cpu_vec, 
+                              const std::vector<T>& gpu_vec, 
+                              int Nx, int Ny, 
+                              bool is_gpu_transposed) {
+    
+    // Boyut güvenlik kontrolü
+    if (cpu_vec.size() != gpu_vec.size()) {
+        std::cerr << "UYARI: CPU ve GPU vektor boyutlari esit degil!" << std::endl;
+        // İsterseniz burada return -1 yapabilirsiniz ama hesaplamaya devam ediyoruz.
+    }
+
+    double total_sq_error = 0.0;
+    int total_elements = Nx * Ny;
+
+    for (int r = 0; r < Nx; ++r) {
+        for (int c = 0; c < Ny; ++c) {
+            
+            // 1. CPU İndeksi (Düz / Row-Major)
+            int idx_cpu = r * Ny + c;
+            
+            // 2. GPU İndeksi (Transpoze durumuna göre)
+            int idx_gpu;
+            if (is_gpu_transposed) {
+                // Eğer GPU verisi Transpoze geldiyse (Satırlar Sütun olmuş)
+                // Erişim: c * SatırSayısı + r
+                idx_gpu = c * Nx + r; 
+            } else {
+                // GPU verisi de Düz ise
+                idx_gpu = r * Ny + c;
+            }
+
+            // Değerleri Vektörden Çek
+            T val_cpu = cpu_vec[idx_cpu];
+            T val_gpu = gpu_vec[idx_gpu];
+
+            // Farkı Hesapla
+            // Eğer 'Complex' tipiniz std::complex ise bu operatörler çalışır.
+            // Eğer custom struct ise aşağıda elle hesaplama (manual) kısmına bakın.
+            T diff = val_cpu - val_gpu; 
+            
+            // std::norm -> |z|^2 (real^2 + imag^2) döndürür
+            total_sq_error += std::norm(diff);
+        }
+    }
+
+    std::cout <<"RMSE : " << std::sqrt(total_sq_error / total_elements) << std::endl;
+}
 
 inline void veriUret( std::vector<Complex>& inputData, std::vector<stTarget>targets)
 {

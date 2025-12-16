@@ -1,15 +1,18 @@
+// nvcc -arch=sm_86 -std=c++17 -O3 --ptxas-options=-v  mainLast.cu --options-file compile2.txt
 #include "defines.h"
 #include "GPU_FMCW/gpu_fmcw.h"
 #include "CPU_FMCW/cpu_fmcw.h"
 
 std::vector<stTarget> s1 = { 
         {1, 40.0f,  15.0f, 1.0f},
-        {2, 70.0f, -10.0f, 0.5f},
+        {2, 60.0f, -10.0f, 0.5f},
         {3, 20.0f,   5.0f, 0.8f}
         };
 
 int main()
 {
+    long long total_bytes = TOTAL_SIZE * sizeof(float);
+    long long transferred_bytes = 2 * total_bytes;
     std::vector<Complex> inputData(TOTAL_SIZE);
 
     std::vector<Complex> outputDataCpu(TOTAL_SIZE);
@@ -57,8 +60,10 @@ int main()
     dosyaAdi = "GPU_FMCW/gpu_Manuel_FFT_SharedYok.txt";
     fs::remove(dosyaAdi);
     dosyayaYaz(dosyaAdi, fCpuTime / (float)iTekrarSayisi,  fGpuTime2D / (float)iTekrarSayisi, outputDataGpuManuel, s1, 100.0);
-
-    printf("GPU Manuel FFT Shared yok: Compute time %f total time %f \n", float(fGpuComputeTimeManuel/iTekrarSayisi), float(fGpuTimeManuel/iTekrarSayisi));
+    float avgGPUComputeTime = float(fGpuComputeTimeManuel/iTekrarSayisi);
+    float avgGPUTotalTime = float(fGpuTimeManuel/iTekrarSayisi);
+    double bandWithGPUManuel =  (transferred_bytes * 1e-9)/(avgGPUComputeTime/1000.0);
+    printf("GPU Manuel FFT Shared yok: Compute time %f ms total time %f ms bandWithGPUManuel : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", avgGPUComputeTime, avgGPUTotalTime, bandWithGPUManuel);
     fGpuTimeManuel = 0.0;
     fGpuComputeTimeManuel = 0.0;
     for(int i = 0; i < iTekrarSayisi; i++)
@@ -68,8 +73,8 @@ int main()
         fGpuTimeManuel += gpuFMCW->getGpuTime();
         fGpuComputeTimeManuel += gpuFMCW->getGpuComputeTime();
     }
- 
-    printf("GPU Manuel FFT Shared Mem: Compute time %f total time %f \n", float(fGpuComputeTimeManuel/iTekrarSayisi), float(fGpuTimeManuel/iTekrarSayisi));
+    double bandWithGPUManuelSharedMem =  (transferred_bytes * 1e-9)/(float(fGpuComputeTimeManuel/(iTekrarSayisi*1000.0)));   
+    printf("GPU Manuel FFT Shared Mem: Compute time %f ms  total time %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", float(fGpuComputeTimeManuel/iTekrarSayisi), float(fGpuTimeManuel/iTekrarSayisi), bandWithGPUManuelSharedMem);
 
     for(int i = 0; i < iTekrarSayisi; i++)
     {
@@ -79,7 +84,8 @@ int main()
         fGpuComputeTime += gpuFMCW->getGpuComputeTime();
     }
 
-    printf("GPU Manuel Transpose: Compute time %f total time %f \n", float(fGpuComputeTime/iTekrarSayisi), float(fGpuTime/iTekrarSayisi));
+    double bandWithGPUManuelTranspose =  (transferred_bytes * 1e-9)/(float(fGpuComputeTime/(iTekrarSayisi*1000.0))); 
+    printf("GPU Manuel Transpose: Compute time %f total time %f  bandWithGPUManuelTranspose : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", float(fGpuComputeTime/iTekrarSayisi), float(fGpuTime/iTekrarSayisi), bandWithGPUManuelTranspose);
 
     Complex *h_pinned_input, *h_pinned_outputGPU, *h_pinned_outputCPU;
     gpuErrchk(cudaMallocHost((void**)&h_pinned_input, TOTAL_SIZE * sizeof(Complex)));
@@ -95,7 +101,8 @@ int main()
         fGpuComputeTime2D += gpuFMCW2->getGpuComputeTime();
     }
     memcpy(outputDataGpu2D.data(), h_pinned_outputGPU, sizeof(Complex) * TOTAL_SIZE);
-    printf("2D_FFT Compute time %f total time %f \n", float(fGpuComputeTime2D/iTekrarSayisi), float(fGpuTime2D/iTekrarSayisi));
+    double bandWithGPU2D =  (transferred_bytes * 1e-9)/(float(fGpuComputeTime2D/(iTekrarSayisi*1000.0))); 
+    printf("2D_FFT Compute time %f total time %f bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", float(fGpuComputeTime2D/iTekrarSayisi), float(fGpuTime2D/iTekrarSayisi), bandWithGPU2D);
 
 
     for(int i = 0; i < iTekrarSayisi; i++)
@@ -148,16 +155,15 @@ int main()
     dosyaAdi = "CPU_FMCW/cpu_AVX.txt";
     fs::remove(dosyaAdi);
     dosyayaYaz(dosyaAdi, fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpuAVX, s1, 100.0);
-
-    /*    
-    dosyaAdi = "GPU_FMCW/gpu_2D.txt";
-    fs::remove(dosyaAdi);
-    dosyayaYaz(dosyaAdi, fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu2D, s1, 100.0);
     
-    dosyaAdi = "GPU_FMCW/gpu_2D.txt";
-    fs::remove(dosyaAdi);
-    dosyayaYaz(dosyaAdi, fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataGpu2D, s1, 100.0);
-    */
+    printf("GPUManuelFFTSharedMem vs AVX RMSE \n");
+    calculate_RMSE_Vectors(outputDataCpuAVX, outputDataGpuManuel, NUM_SAMPLES, NUM_CHIRPS, false);  
+    
+    printf("GpuManuelTranspose vs AVX RMSE \n");
+    calculate_RMSE_Vectors(outputDataCpuAVX, outputDataGpuManuelTranspose, NUM_SAMPLES, NUM_CHIRPS, false);  
+
+    printf("Gpu2D vs AVX RMSE \n");
+    calculate_RMSE_Vectors(outputDataCpuAVX, outputDataGpu2D, NUM_SAMPLES, NUM_CHIRPS, true);  
 
     
 }

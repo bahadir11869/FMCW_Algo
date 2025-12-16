@@ -54,8 +54,8 @@ __global__ void k_butterfly_stage(cuComplex* d_data, int n, int current_stage_wi
         int pos2 = pos1 + current_stage_width;
 
         // Twiddle Factor Hesabı: W = e^(-j * 2*pi * k / N_stage)
-        double angle = -2.0 * PI * pair_idx / (double)(current_stage_width * 2.0);
-        cuComplex w = make_cuComplex(cos(angle), sin(angle));
+        float angle = -2.0 * PI * pair_idx / (float)(current_stage_width * 2.0);
+        cuComplex w = make_cuComplex(cosf(angle), sinf(angle));
 
         cuComplex data1 = d_data[pos1];
         cuComplex data2 = d_data[pos2];
