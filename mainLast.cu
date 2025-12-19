@@ -63,6 +63,7 @@ int main()
     float avgGPUComputeTime = float(fGpuComputeTimeManuel/iTekrarSayisi);
     float avgGPUTotalTime = float(fGpuTimeManuel/iTekrarSayisi);
     double bandWithGPUManuel =  (transferred_bytes * 1e-9)/(avgGPUComputeTime/1000.0);
+    printf("\n\n\t\t\t --------SONUCLAR --------- \n\n");
     printf("GPU Manuel FFT Shared yok: Compute time %f ms total time %f ms bandWithGPUManuel : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", avgGPUComputeTime, avgGPUTotalTime, bandWithGPUManuel);
     fGpuTimeManuel = 0.0;
     fGpuComputeTimeManuel = 0.0;
@@ -151,12 +152,12 @@ int main()
     dosyaAdi = "CPU_FMCW/cpu_Recursive_OpenMP.txt";
     fs::remove(dosyaAdi);
     dosyayaYaz(dosyaAdi, fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpuOpenMP, s1, 100.0);
-
+      
     dosyaAdi = "CPU_FMCW/cpu_AVX.txt";
     fs::remove(dosyaAdi);
     dosyayaYaz(dosyaAdi, fCpuTime / (float)iTekrarSayisi,  fGpuTime / (float)iTekrarSayisi, outputDataCpuAVX, s1, 100.0);
-    
-    printf("GPUManuelFFTSharedMem vs AVX RMSE \n");
+
+    printf("\n\nGPUManuelFFTSharedMem vs AVX RMSE \n");
     calculate_RMSE_Vectors(outputDataCpuAVX, outputDataGpuManuel, NUM_SAMPLES, NUM_CHIRPS, false);  
     
     printf("GpuManuelTranspose vs AVX RMSE \n");
@@ -164,6 +165,9 @@ int main()
 
     printf("Gpu2D vs AVX RMSE \n");
     calculate_RMSE_Vectors(outputDataCpuAVX, outputDataGpu2D, NUM_SAMPLES, NUM_CHIRPS, true);  
+
+    save_rdm_data("GPU_FMCW/2DFFT_GPU.csv", outputDataGpu2D, false);
+    save_rdm_data("CPU_FMCW/AVXFFT_CPU.csv", outputDataCpuAVX, true);  
 
     
 }

@@ -137,12 +137,8 @@ inline void dosyayaYaz(const char* cpDosyaIsmi, float fOrtCpuSuresi, float fOrtG
         std::cerr << "Dosya acilamadi!" << std::endl;
         return;
     }
-    fprintf(fp,"CPU Sure: %.2f ms\n", fOrtCpuSuresi);
-    fprintf(fp, "GPU Sure: %.2f ms\n", fOrtGpuSuresi);
-    fprintf(fp, "SpeedUp: %.2fx\n", fOrtCpuSuresi/fOrtGpuSuresi);
     fprintf(fp, "=== RADAR ANALIZ RAPORU ===\n");
     fprintf(fp, "Resolution    : Range = %.4f m | Velocity = %.4f m/s\n", range_res, velocity_res);
-    
     fprintf(fp, "--- HEDEF TESPIT TABLOSU ---\n");
     fprintf(fp, "%-4s | %-12s | %-12s | %-10s || %-12s | %-12s | %-10s | %-8s\n", 
            "ID", "Est_R(m)", "True_R(m)", "Diff_R", "Est_V(m/s)", "True_V(m/s)", "Diff_V", "Match");
@@ -291,4 +287,48 @@ inline void dosyayaYaz(const char* cpDosyaIsmi, float fOrtCpuSuresi, float fOrtG
     fprintf(fp, "----------------------------------------------------------------------------------------------------\n");
     fclose(fp); // Dosyayı kapatmayı unutma!
 
+}
+
+
+inline void save_rdm_data(const char* filename, const std::vector<Complex>& gpu_result, bool is_input_transposed)
+{
+    FILE* fp = fopen(filename, "w");
+    if (!fp) {
+        std::cerr << "Dosya acilamadi: " << filename << std::endl;
+        return;
+    }
+
+    // Hedef: Python imshow için standart format: [Doppler(Satır)][Range(Sütun)]
+    // Bu yüzden dış döngü Doppler (Chirp), iç döngü Range (Sample) olmalı.
+    
+    for (int v = 0; v < NUM_CHIRPS; ++v)      // Satırlar: Hız (Doppler)
+    {
+        for (int r = 0; r < NUM_SAMPLES; ++r) // Sütunlar: Mesafe (Range)
+        {
+            int idx;
+            
+            if (is_input_transposed) 
+            {
+                // DURUM 1: Manuel Transpose Çıktısı [Sample][Chirp] şeklindedir.
+                // Biz (v, r) koordinatına ulaşmak için bellekte (r, v) konumuna gitmeliyiz.
+                // Bellek formülü: r * (SatırUzunluğu=NUM_CHIRPS) + v
+                idx = r * NUM_CHIRPS + v; 
+            } 
+            else 
+            {
+                // DURUM 2: 2D FFT Çıktısı [Chirp][Sample] şeklindedir (Orijinal düzen).
+                // Bellek formülü: v * (SatırUzunluğu=NUM_SAMPLES) + r
+                idx = v * NUM_SAMPLES + r;
+            }
+
+            // Genlik hesapla
+            float amp = std::abs(gpu_result[idx]);
+            
+            fprintf(fp, "%.4f", amp);
+            if (r < NUM_SAMPLES - 1) fprintf(fp, ",");
+        }
+        fprintf(fp, "\n"); // Satır bitti, alta geç
+    }
+
+    fclose(fp);
 }

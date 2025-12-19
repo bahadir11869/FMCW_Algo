@@ -4,7 +4,6 @@
 
 gpu_fmcw::gpu_fmcw(int fftType)
 {
-
     fgpuTime = 0.0;
     fgpuComputeTime = 0.0;
     cudaEventCreate(&start);
