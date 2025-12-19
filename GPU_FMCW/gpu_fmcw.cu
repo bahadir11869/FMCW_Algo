@@ -2,10 +2,11 @@
 #include "../KERNEL_FMCW/kernels.h"
 
 
-gpu_fmcw::gpu_fmcw(int fftType)
+gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
 {
-    fgpuTime = 0.0;
-    fgpuComputeTime = 0.0;
+    this->strDosyaAdi = strDosyaAdi;
+    vfgpuTime = {};
+    vfgpuComputeTime = {};
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventCreate(&start2);
@@ -14,11 +15,12 @@ gpu_fmcw::gpu_fmcw(int fftType)
     gpuErrchk(cudaMalloc(&d_data, TOTAL_SIZE * sizeof(cuComplex))); 
     log2_samples = (int)log2((double)NUM_SAMPLES);
     log2_chirps  = (int)log2((double)NUM_CHIRPS);
+    output.resize(TOTAL_SIZE);   
     if(fftType == 1)
     {
         cufftPlan1d(&planRange, NUM_SAMPLES, CUFFT_C2C, NUM_CHIRPS);
         cufftPlan1d(&planDoppler, NUM_CHIRPS, CUFFT_C2C, NUM_SAMPLES);
-        gpuErrchk(cudaMalloc(&d_transposed, TOTAL_SIZE * sizeof(cuComplex)));        
+        gpuErrchk(cudaMalloc(&d_transposed, TOTAL_SIZE * sizeof(cuComplex)));    
     }
     else
     {
@@ -70,7 +72,7 @@ void gpu_fmcw::execute_naive_fft(cuComplex* data_ptr, cuComplex* temp_ptr, int n
         k_butterfly_stage<<<blocks_bf, threads>>>(data_ptr, n, stage_width, batch_count);
     }
 }
-void gpu_fmcw::run_gpu_manuel_FFT_Shared_Yok(std::vector<Complex>& input, std::vector<Complex>& output)
+void gpu_fmcw::run_gpu_manuel_FFT_Shared_Yok(std::vector<Complex>& input)
 {
     size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
     if(input.size() != TOTAL_SIZE) 
@@ -101,11 +103,15 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Yok(std::vector<Complex>& input, std::v
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
+
+
     cudaEventElapsedTime(&fgpuTime, start, stop);
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
+    vfgpuTime.push_back(fgpuTime);
+    vfgpuComputeTime.push_back(fgpuComputeTime);
 }
 
-void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, std::vector<Complex>& output)
+void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input)
 {
     size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
     if(input.size() != TOTAL_SIZE) output.resize(TOTAL_SIZE);
@@ -164,9 +170,11 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, std::v
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&fgpuTime, start, stop);
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
+    vfgpuTime.push_back(fgpuTime);
+    vfgpuComputeTime.push_back(fgpuComputeTime);
 }
 
-void gpu_fmcw::run_gpu_manuel_transpose(std::vector<Complex>& input, std::vector<Complex>& output)
+void gpu_fmcw::run_gpu_manuel_transpose(std::vector<Complex>& input)
 {
     size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
     output.resize(TOTAL_SIZE);
@@ -186,9 +194,11 @@ void gpu_fmcw::run_gpu_manuel_transpose(std::vector<Complex>& input, std::vector
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&fgpuTime, start, stop);
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
+    vfgpuTime.push_back(fgpuTime);
+    vfgpuComputeTime.push_back(fgpuComputeTime);
 }
 
-void gpu_fmcw::run_gpu_2DFFT(Complex* input, Complex* output)
+void gpu_fmcw::run_gpu_2DFFT(Complex* input, Complex* ptroutput)
 {
     size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
 
@@ -204,7 +214,7 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, Complex* output)
     cudaEventRecord(stop2);
     cudaEventSynchronize(stop2);
     // 3. Veri Transferi (Device -> Host)
-    gpuErrchk(cudaMemcpy(output, d_data, sizeBytes, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(ptroutput, d_data, sizeBytes, cudaMemcpyDeviceToHost));
 
     cudaEventRecord(stop);
     // --- KRITIK BOLGE BITIS ---
@@ -212,14 +222,38 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, Complex* output)
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&fgpuTime, start, stop);
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
+    vfgpuTime.push_back(fgpuTime);
+    vfgpuComputeTime.push_back(fgpuComputeTime);
+    memcpy(output.data(), ptroutput, sizeBytes);
 }
 
 
 float gpu_fmcw::getGpuTime()
 {
-    return fgpuTime;
+    float fSum = 0.0f;
+    for(auto i: vfgpuTime)
+    {
+        fSum += i;
+    }
+    return fSum / vfgpuTime.size();
 }
 float gpu_fmcw::getGpuComputeTime()
 {
-    return fgpuComputeTime;
+    float fSum = 0.0f;
+    for(auto i: vfgpuComputeTime)
+    {
+        fSum += i;
+    }
+    return fSum / vfgpuComputeTime.size();
+}
+
+std::string gpu_fmcw::getDosyaAdi()
+{
+    return strDosyaAdi;
+}
+
+
+std::vector<Complex> gpu_fmcw::getOutput()
+{
+    return output;    
 }

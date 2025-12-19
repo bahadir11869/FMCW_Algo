@@ -129,8 +129,9 @@ inline void veriUret( std::vector<Complex>& inputData, std::vector<stTarget>targ
     }
 }
 
-inline void dosyayaYaz(const char* cpDosyaIsmi, float fOrtCpuSuresi, float fOrtGpuSuresi, std::vector<Complex> vResult, std::vector<stTarget> targets, float threshold, bool b2DFFTMi = false)
+inline void dosyayaYaz(const char* cpDosyaIsmi, std::vector<Complex> vResult, std::vector<stTarget> targets, float threshold, bool b2DFFTMi = false)
 {
+    fs::remove(cpDosyaIsmi);
     FILE* fp = fopen(cpDosyaIsmi, "w");
     if (fp == NULL) 
     {

@@ -3,10 +3,12 @@
 #include <mkl.h>
 
 
-cpu_fmcw::cpu_fmcw()
+cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
 {
+    this->strDosyaAdi = strDosyaAdi;
     fcpuTime = 0.0;
-    fcpuAVXComputeTime = 0.0;
+    vfcpuTime = {};
+    output.resize(TOTAL_SIZE);   
 }
 
 cpu_fmcw::~cpu_fmcw()
@@ -33,7 +35,7 @@ void cpu_fmcw::cpu_recursive_fft(std::vector<Complex>& a)
     }
 }
 
-void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input, std::vector<Complex>& output)
+void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
 {
     std::vector<Complex> data = input; output.resize(TOTAL_SIZE);
     auto start = std::chrono::high_resolution_clock::now();
@@ -66,9 +68,10 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input, std::vector<Comp
     }
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
+    vfcpuTime.push_back(fcpuTime);
 }
 
-void cpu_fmcw::run_cpu_openmp(const std::vector<Complex>& input, std::vector<Complex>& output) 
+void cpu_fmcw::run_cpu_openmp(const std::vector<Complex>& input) 
 {
     std::vector<Complex> data = input;
     output.resize(TOTAL_SIZE);
@@ -112,11 +115,12 @@ void cpu_fmcw::run_cpu_openmp(const std::vector<Complex>& input, std::vector<Com
 
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
+    vfcpuTime.push_back(fcpuTime);
 }
 
-void cpu_fmcw::run_cpu_avx(Complex* input, Complex* output) 
+void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput) 
 {
-   std::memcpy(output, input, TOTAL_SIZE * sizeof(Complex));
+   std::memcpy(ptroutput, input, TOTAL_SIZE * sizeof(Complex));
     Complex* temp_buffer = new Complex[TOTAL_SIZE];
     auto start = std::chrono::high_resolution_clock::now();
     // --- MKL CONFIGURATION ---
@@ -151,8 +155,7 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* output)
     // --- 2. RANGE FFT İŞLEMİ ---
     // DftiComputeForward: Tek satırda 256 tane FFT'yi AVX-512 ile hesaplar.
     // std::complex* -> void* dönüşümü yapıyoruz.
-    auto start2 = std::chrono::high_resolution_clock::now();
-    status = DftiComputeForward(handRange, (void*)output);
+    status = DftiComputeForward(handRange, (void*)ptroutput);
 
     // --- 3. TRANSPOSE (MKL OMATCOPY veya OPENMP) ---
     // MKL'in matris çevirme fonksiyonu da var ama OpenMP daha anlaşılır.
@@ -160,32 +163,42 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* output)
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < NUM_CHIRPS; ++i) {
         for (int j = 0; j < NUM_SAMPLES; ++j) {
-            temp_buffer[j * NUM_CHIRPS + i] = output[i * NUM_SAMPLES + j];
+            temp_buffer[j * NUM_CHIRPS + i] = ptroutput[i * NUM_SAMPLES + j];
         }
     }
 
     // --- 4. DOPPLER FFT İŞLEMİ ---
     // Transpoze edilmiş 'output' verisi üzerinde çalışıyoruz.
     status = DftiComputeForward(handDoppler, (void*)temp_buffer);
-    auto end2 = std::chrono::high_resolution_clock::now();
     auto end = std::chrono::high_resolution_clock::now();
     // --- TEMİZLİK ---
     DftiFreeDescriptor(&handRange);
     DftiFreeDescriptor(&handDoppler);
 
     
-    std::memcpy(output, temp_buffer, TOTAL_SIZE * sizeof(Complex));
+    std::memcpy(ptroutput, temp_buffer, TOTAL_SIZE * sizeof(Complex));
     delete[] temp_buffer;
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
-    fcpuAVXComputeTime = std::chrono::duration<float, std::milli>(end2 - start2).count();
+    vfcpuTime.push_back(fcpuTime);
+    memcpy(output.data(), ptroutput, TOTAL_SIZE * sizeof(Complex));
 }
 
 float cpu_fmcw::getCpuTime()
 {
-    return fcpuTime;
+    float fSum = 0.0f;
+    for(auto i : vfcpuTime)
+    {
+        fSum += i;
+    }
+    return fSum/vfcpuTime.size();
 }
 
-float cpu_fmcw::getCpuComputeTime()
+std::string cpu_fmcw::getFileName()
 {
-    return fcpuAVXComputeTime;
+    return strDosyaAdi;
+}
+
+std::vector<Complex> cpu_fmcw::getOutput()
+{
+    return output;
 }
