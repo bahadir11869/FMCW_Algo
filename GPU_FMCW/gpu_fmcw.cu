@@ -16,6 +16,11 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
     log2_samples = (int)log2((double)NUM_SAMPLES);
     log2_chirps  = (int)log2((double)NUM_CHIRPS);
     output.resize(TOTAL_SIZE);   
+    for (int i = 0; i < 4; ++i) 
+    {
+        cudaStreamCreate(&streams[i]);
+    }
+
     if(fftType == 1)
     {
         cufftPlan1d(&planRange, NUM_SAMPLES, CUFFT_C2C, NUM_CHIRPS);
@@ -40,6 +45,11 @@ gpu_fmcw::~gpu_fmcw()
     cudaEventDestroy(stop);
     cudaEventDestroy(start2);
     cudaEventDestroy(stop2);
+
+    for (int i = 0; i < 4; ++i) 
+    {
+        cudaStreamDestroy(streams[i]);
+    }
 
     if(fftType == 1)
     {
@@ -172,6 +182,72 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input)
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
     vfgpuTime.push_back(fgpuTime);
     vfgpuComputeTime.push_back(fgpuComputeTime);
+}
+
+void gpu_fmcw::run_gpu_streams(Complex* h_input, Complex* h_output)
+{
+    // Veriyi 4 parçaya bölüyoruz
+    int nStreams = 4;
+    int chirpsPerStream = NUM_CHIRPS / nStreams; // 2048 / 4 = 512 Chirp
+    int samplesPerStream = chirpsPerStream * NUM_SAMPLES; // Veri boyutu
+    size_t streamBytes = samplesPerStream * sizeof(cuComplex);
+
+    cudaEventRecord(start); // Süreyi başlat
+
+    // --- AŞAMA 1: Range FFT + Veri Yükleme (PIPELINE) ---
+    // Döngü dönerken: Bir stream yükleme yaparken diğeri hesaplama yapacak.
+    
+    cudaEventRecord(start2); // Compute süresi (Transfer dahil pipeline)
+
+    for (int i = 0; i < nStreams; ++i) 
+    {
+        int offset = i * samplesPerStream; // Verinin başlangıç noktası
+
+        // 1. ASENKRON Kopyalama (Host -> Device)
+        // CPU beklemez, hemen bir sonraki satıra geçer.
+        cudaMemcpyAsync(&d_data[offset], &h_input[offset], streamBytes, cudaMemcpyHostToDevice, streams[i]);
+
+        // 2. Range FFT (Sadece o parçayı işle)
+        // Kernelin o parçada çalışması için pointer'ı kaydırıyoruz (d_data + offset)
+        int threadsPerBlock = NUM_SAMPLES / 2;
+        int numBlocks = chirpsPerStream; // Sadece 512 blok
+        int sharedMemSize = NUM_SAMPLES * sizeof(cuComplex);
+
+        k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize, streams[i]>>>(d_data + offset, NUM_SAMPLES, log2_samples);
+    }
+
+    // DİKKAT: Transpose işlemi tüm verinin bitmesini beklemek ZORUNDADIR.
+    // Çünkü satır verisi sütuna dönüşecek, veriler karışacak.
+    cudaDeviceSynchronize(); 
+
+    // --- AŞAMA 2: Transpose (Mevcut Kernel - Aynen kalıyor) ---
+    dim3 threads(TILE_DIM, TILE_DIM);
+    dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
+    transpose_optimized_kernel<<<blocks, threads>>>(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS);
+    
+    // --- AŞAMA 3: Doppler FFT ---
+    // Transpose sonrası veri d_transposed içinde. Bunu çalıştırıyoruz.
+    int threadsPerBlock = NUM_CHIRPS / 2; 
+    int numBlocks = NUM_SAMPLES;
+    int sharedMemSize = NUM_CHIRPS * sizeof(cuComplex);
+    
+    // Doppler FFT (Sonuç d_transposed üzerinde kalıyor)
+    k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_transposed, NUM_CHIRPS, log2_chirps);
+    
+    cudaEventRecord(stop2); // Compute Bitiş
+
+    // --- AŞAMA 4: Sonuç Kopyalama (Device -> Host) ---
+    // Bunu da istersen stream ile bölebilirsin ama tek seferde alalım şimdilik.
+    cudaMemcpy(h_output, d_transposed, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost);
+
+    cudaEventRecord(stop); // Toplam Bitiş
+    cudaEventSynchronize(stop);
+
+    cudaEventElapsedTime(&fgpuTime, start, stop);
+    cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
+    vfgpuTime.push_back(fgpuTime);
+    vfgpuComputeTime.push_back(fgpuComputeTime);
+    memcpy(output.data(), h_output, TOTAL_SIZE * sizeof(cuComplex));
 }
 
 void gpu_fmcw::run_gpu_manuel_transpose(std::vector<Complex>& input)

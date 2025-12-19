@@ -4,7 +4,7 @@ import os
 
 # --- C++ defines.h ile Aynı Parametreler ---
 NUM_CHIRPS = 2048      
-NUM_SAMPLES = 1024     
+NUM_SAMPLES = 2048     
 
 C = 3e8
 FC = 77e9

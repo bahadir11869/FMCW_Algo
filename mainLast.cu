@@ -17,6 +17,7 @@ int main()
     long long transferred_bytes = 2 * total_bytes;
 
     std::vector<Complex> inputData(TOTAL_SIZE);
+    std::vector<Complex> outputData(TOTAL_SIZE);
 
     Complex *h_pinned_input, *h_pinned_outputGPU, *h_pinned_outputCPU;
     gpuErrchk(cudaMallocHost((void**)&h_pinned_input, TOTAL_SIZE * sizeof(Complex)));
@@ -31,6 +32,7 @@ int main()
 
     gpu_fmcw gpuManuelNoSHM(1, "GPU_FMCW/gpu_Manuel_FFT_SharedYok.txt");
     gpu_fmcw gpuManuelSHM(1,"GPU_FMCW/gpu_Manuel_FFT_Shared.txt");
+    gpu_fmcw gpuManuelSHMStream(1,"GPU_FMCW/gpu_Manuel_FFT_Shared_Stream.txt");
     gpu_fmcw gpu1DCufftManuelTranspose(1, "GPU_FMCW/gpu_1DFFT_ManuelTranspose.txt");
     gpu_fmcw gpu2DFFT(2,"GPU_FMCW/2DFFT.txt");
 
@@ -45,6 +47,12 @@ int main()
     for(int i = 0; i < iTekrarSayisi; i++)
     {
         gpuManuelSHM.run_gpu_manuel_FFT_Shared_Mem(inputData);
+        gpuErrchk(cudaDeviceSynchronize());
+    }
+
+    for(int i = 0; i < iTekrarSayisi; i++)
+    {
+        gpuManuelSHMStream.run_gpu_streams(inputData.data(), outputData.data());
         gpuErrchk(cudaDeviceSynchronize());
     }
     
@@ -83,6 +91,7 @@ int main()
     /* CIKTILARI DOSYAYA YAZMA */        
     dosyayaYaz(gpuManuelNoSHM.getDosyaAdi().c_str(), gpuManuelNoSHM.getOutput(), s1, 100.0);
     dosyayaYaz(gpuManuelSHM.getDosyaAdi().c_str(), gpuManuelSHM.getOutput(), s1, 100.0);
+    dosyayaYaz(gpuManuelSHMStream.getDosyaAdi().c_str(), gpuManuelSHMStream.getOutput(), s1, 100.0);
     dosyayaYaz(gpu1DCufftManuelTranspose.getDosyaAdi().c_str(), gpu1DCufftManuelTranspose.getOutput(), s1, 100.0);
     dosyayaYaz(gpu2DFFT.getDosyaAdi().c_str(), gpu2DFFT.getOutput(), s1, 100.0, true);
 
@@ -92,18 +101,22 @@ int main()
 
     /* SONUCLARI EKRANA YAZMA */        
     printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR GPU --------- \n\n");
-    printf("GPU Manuel FFT Shared yok: Compute time %f ms total time %f ms bandWithGPUManuel : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelNoSHM.getGpuComputeTime(), gpuManuelNoSHM.getGpuTime(), float(transferred_bytes * 1e-9)/(gpuManuelNoSHM.getGpuComputeTime()/1000.0));
-    printf("GPU Manuel FFT Shared Mem: Compute time %f ms  total time %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));
-    printf("GPU 1DFFT Manuel Transpose : Compute time %f total time %f  bandWithGPUManuelTranspose : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu1DCufftManuelTranspose.getGpuComputeTime(), gpu1DCufftManuelTranspose.getGpuTime(), (transferred_bytes * 1e-9)/(gpu1DCufftManuelTranspose.getGpuComputeTime()/1000.0));    
-    printf("2D_FFT Compute time %f total time %f bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
+    printf("GPU Manuel FFT Shared yok: Compute time: %f ms total time: %f ms bandWithGPUManuel : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelNoSHM.getGpuComputeTime(), gpuManuelNoSHM.getGpuTime(), float(transferred_bytes * 1e-9)/(gpuManuelNoSHM.getGpuComputeTime()/1000.0));    
+    printf("GPU Manuel FFT Shared Mem: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));    
+    printf("GPU Manuel FFT Shared Stream: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHMStream.getGpuComputeTime(),  gpuManuelSHMStream.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHMStream.getGpuComputeTime()/1000.0));
+    printf("GPU 1DFFT Manuel Transpose : Compute time: %f ms total time: %f ms  bandWithGPUManuelTranspose : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu1DCufftManuelTranspose.getGpuComputeTime(), gpu1DCufftManuelTranspose.getGpuTime(), (transferred_bytes * 1e-9)/(gpu1DCufftManuelTranspose.getGpuComputeTime()/1000.0));    
+    printf("2D_FFT Compute time: %f ms total time: %f ms bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
     
     printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR CPU --------- \n\n");
-    printf("CPU Recursive FFT Time : %f CPU Recurisive FFT OpenMP Time: %f CPU AVX Total Time: %f\n", 
+    printf("CPU Recursive FFT time: %f CPU Recurisive FFT OpenMP time: %f CPU AVX Total time: %f\n", 
     cpuFMCWManuel.getCpuTime(), cpuFMCWOpenMP.getCpuTime(), cpuFMCWAVX.getCpuTime());
     
     printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR CPU AVX vs GPU  --------- \n\n");
     printf("GPUManuelFFTSharedMem vs AVX RMSE \n");
     calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpuManuelSHM.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
+
+    printf("GPUManuelFFTStream vs AVX RMSE \n");
+    calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpuManuelSHMStream.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
     
     printf("\nGpuManuelTranspose vs AVX RMSE \n");
     calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpu1DCufftManuelTranspose.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  

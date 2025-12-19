@@ -1,0 +1,160 @@
+\documentclass{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}   % Tablolar için profesyonel görünüm
+\usepackage{graphicx}   % Grafik eklemek için
+\usepackage{float}      % Tablo ve resim konumlandırma için
+\usepackage{url}        % URL referansları için
+\usepackage{subcaption} % Yan yana veya alt alta resimler için
+
+\title{BLG 562E – Term Project Progress Report \\ High-Performance Parallelization of FMCW Radar Signal Processing on GPU}
+\author{Bahadır Çeliktaş \quad 504251244}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+\textbf{Problem Definition:}
+Frequency Modulated Continuous Wave (FMCW) radar systems require intensive signal processing steps, primarily Fast Fourier Transforms (FFT) and matrix transpositions, to determine the range and velocity of targets \cite{richards2014}. In real-time applications such as autonomous driving or drone navigation, these computations must be performed with extremely low latency. Standard CPU implementations often fail to meet these real-time constraints as the data resolution and radar channel count increase.
+
+\noindent
+\textbf{Motivation:}
+The primary motivation is to leverage the massive parallelism of modern GPU architectures (specifically NVIDIA Ampere) to accelerate the FMCW processing pipeline. By offloading computationally heavy tasks like 2D-FFT from the CPU to the GPU, we aim to achieve significant speedups. Furthermore, this project investigates the performance gap between naive implementations and hardware-aware optimizations (Shared Memory, AVX SIMD), analyzing where the true bottlenecks lie (Compute vs. Memory Transfer).
+
+\section{Related Work}
+The Fast Fourier Transform (FFT) is the core algorithm for radar signal processing. While the Cooley-Tukey algorithm is the standard for sequential processing \cite{cooley1965}, parallel implementations vary significantly based on hardware architecture.
+
+State-of-the-art solutions typically rely on vendor-optimized libraries like NVIDIA cuFFT \cite{cufft_lib} or Intel MKL. However, custom kernel implementations are crucial for understanding hardware limits as detailed in the CUDA Programming Guide \cite{cuda_guide}, and for optimizing specific pipeline stages where generic libraries might introduce overhead. Existing literature often compares CPU vs. GPU but rarely details the step-by-step impact of optimizations like register pressure reduction and shared memory banking on modern RTX series cards.
+
+\section{Proposed Method}
+We propose a step-by-step optimization pipeline to parallelize the Range-Doppler map generation algorithm. The implementation stages are as follows:
+
+\begin{itemize}
+    \item \textbf{CPU Baselines:} Implementing Recursive FFT (Reference), OpenMP (Multi-thread), and AVX (SIMD) versions to establish strong baselines.
+    \item \textbf{GPU Naive Implementation:} Direct porting of the algorithm to CUDA using Global Memory.
+    \item \textbf{GPU Optimized Implementation:}
+    \begin{itemize}
+        \item Utilizing \textbf{Shared Memory} to reduce global memory latency during FFT stages.
+        \item Implementing a custom \textbf{Bit-Reversal} kernel.
+        \item Optimizing \textbf{Matrix Transpose} with memory padding to avoid bank conflicts.
+        \item Precision optimization (Double to Float conversion) to utilize FP32 CUDA cores effectively on RTX 3060.
+    \end{itemize}
+    \item \textbf{Comparison:} Benchmarking against the highly optimized NVIDIA cuFFT library.
+\end{itemize}
+
+\section{Experimental Results}
+The experiments were conducted on an NVIDIA RTX 3060 GPU and a generic multi-core CPU. We measured "Compute Time" (kernel execution), "Total Time" (including memory transfers), "Effective Bandwidth," and "RMSE" for validation. The CPU AVX implementation was used as the ground truth reference for accuracy measurements.
+
+\subsection{Performance Analysis}
+Table \ref{tab:final_results} presents the execution times and bandwidth utilization for the final $2048 \times 1024$ configuration. To visualize the scaling behavior across different dataset sizes, we plotted the Total Execution Time (Figure \ref{fig:total_time_plot}) and GPU-only Compute Time (Figure \ref{fig:compute_time_plot}).
+
+\begin{table}[H]
+\centering
+\caption{Performance and Accuracy Comparison (Configuration: 2048 Chirps x 1024 Samples)}
+\label{tab:final_results}
+\resizebox{\textwidth}{!}{% Tabloyu sayfaya sığdırır
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Implementation} & \textbf{Compute (ms)} & \textbf{Total (ms)} & \textbf{Bandwidth (GB/s)} & \textbf{Speedup (vs CPU Rec.)} & \textbf{RMSE Error} \\ \midrule
+CPU Recursive           & 683.85                & $\sim$684           & N/A                       & 1x (Baseline)             & -                   \\
+CPU OpenMP              & 249.18                & 249.18              & N/A                       & 2.7x                      & -                   \\
+CPU AVX (Ref)           & 9.28                  & 9.28                & N/A                       & 74.5x                     & \textbf{Reference}  \\ \midrule
+GPU Global (Naive)      & 6.42                  & 9.85                & 2.61                      & 69.4x                     & N/A                 \\
+\textbf{GPU Shared (Custom)}     & \textbf{0.58}         & \textbf{4.32}       & \textbf{28.68}            & \textbf{158.3x}           & \textbf{0.001048}   \\
+GPU 1D FFT + Manual Transpose      & 0.32                  & 3.87                & 52.85                     & 176.7x                    & 0.000513            \\
+GPU cuFFT (Vendor)      & 0.25                  & 1.80                & 67.38                     & 380.0x                    & 0.000528            \\ \bottomrule
+\end{tabular}
+}
+\end{table}
+
+% --- YENI EKLENEN GRAFIKLER BASLANGIC ---
+\begin{figure}[H]
+    \centering
+    % Grafik 1: Total Time
+    \begin{subfigure}[b]{1.0\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{benchmark_total_time.png}
+        \caption{Total Execution Time vs Data Size (Log Scale). The gap between CPU (dashed magenta) and GPU implementations highlights the massive parallelism advantage.}
+        \label{fig:total_time_plot}
+    \end{subfigure}
+    
+    \vspace{0.5cm} % İki grafik arasına boşluk
+    
+    % Grafik 2: Compute Time
+    \begin{subfigure}[b]{1.0\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{benchmark_compute_time.png}
+        \caption{GPU Compute Time Only vs Data Size (Log Scale). Shared Memory optimization (green line) provides significant speedup over naive implementation, approaching cuFFT performance.}
+        \label{fig:compute_time_plot}
+    \end{subfigure}
+    
+    \caption{Scalability analysis of FMCW Radar Processing algorithms.}
+    \label{fig:benchmark_plots}
+\end{figure}
+% --- YENI EKLENEN GRAFIKLER BITIS ---
+
+\subsection{Bandwidth \& Bottleneck Discussion}
+The naive GPU implementation suffered from uncoalesced memory access patterns, achieving only \textbf{2.61 GB/s}, which is less than 1\% of the RTX 3060's theoretical peak bandwidth (~360 GB/s). By utilizing Shared Memory to localize data on-chip, we achieved a \textbf{~11x improvement} in effective bandwidth (\textbf{28.68 GB/s}).
+
+It is observed that the \textbf{GPU 1D FFT + Manual Transpose} stage achieved significantly higher bandwidth (\textbf{52.85 GB/s}) compared to the full 2D FFT kernel. This is attributed to the lower arithmetic intensity of the transpose operation compared to the complex butterfly operations required for the full FFT. While the custom kernel is extremely fast (0.58 ms compute), the total time is dominated by PCIe transfer overhead ($\sim$3.7 ms), confirming that the system is now bandwidth-bound rather than compute-bound.
+
+\subsection{Validation (RMSE and Visual Analysis)}
+To ensure the correctness of the parallel algorithms, we calculated the Root Mean Square Error (RMSE) against the CPU AVX output.
+\begin{itemize}
+    \item The \textbf{GPU Shared Memory FFT} yielded an RMSE of \textbf{0.0010}, which is negligible for radar signal processing and falls within the expected range for single-precision (FP32) floating-point arithmetic differences.
+    \item The \textbf{GPU 1D FFT + Manual Transpose} and \textbf{cuFFT} implementations showed even lower error rates ($\sim$0.0005), confirming high data integrity during matrix operations.
+\end{itemize}
+
+In addition to numerical verification, visual validation was performed by generating Range-Doppler maps. Figure \ref{fig:rdm_comparison} illustrates the output of the GPU implementation compared to the CPU AVX reference. The identical placement of targets and consistent noise floor visually confirm the correctness of the algorithm.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        % gpu_rdm.jpg dosyasının proje klasöründe olduğundan emin olun
+        \includegraphics[width=\textwidth]{gpu_rdm.jpg}
+        \caption{Method: 2D FFT GPU cuFFT}
+        \label{fig:gpu_map}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        % cpu_avx_rdm.jpg dosyasının proje klasöründe olduğundan emin olun
+        \includegraphics[width=\textwidth]{cpu_avx_rdm.jpg}
+        \caption{Method: CPU AVX Lib}
+        \label{fig:cpu_map}
+    \end{subfigure}
+    \caption{Comparison of Range-Doppler Maps generated by GPU (Left) and CPU AVX (Right). The resolution is 1.00 m in Range and 0.02 m/s in Velocity.}
+    \label{fig:rdm_comparison}
+\end{figure}
+
+
+\section{Conclusion}
+We have successfully implemented and optimized the FMCW radar algorithms on the GPU. The transition from naive Global Memory usage to Shared Memory resulted in dramatic compute speedups and bandwidth improvements. However, our analysis reveals that as computation becomes extremely fast, the memory transfer over PCIe bus becomes the dominant latency factor.
+
+The following steps are planned to be accomplished before submitting the final report:
+\begin{itemize}
+    \item \textbf{Step 1: Pinned Memory Optimization.} Implementing \texttt{cudaMallocHost} (Pinned/Page-locked memory) to maximize PCIe bandwidth and reduce the transfer overhead observed in the results.
+    \item \textbf{Step 2: CUDA Streams.} Overlapping data transfer with kernel execution (pipelining) to hide latency.
+    \item \textbf{Step 3: Real Data Validation.} Testing the pipeline with larger, real-world ADC datasets to observe scaling behavior.
+\end{itemize}
+
+\begin{thebibliography}{9}
+
+\bibitem{cooley1965}
+J. W. Cooley and J. W. Tukey, "An algorithm for the machine calculation of complex Fourier series," \textit{Mathematics of Computation}, vol. 19, no. 90, pp. 297–301, 1965.
+
+\bibitem{richards2014}
+M. A. Richards, \textit{Fundamentals of Radar Signal Processing}, 2nd ed. New York, NY, USA: McGraw-Hill Education, 2014.
+
+\bibitem{cuda_guide}
+NVIDIA Corporation, "NVIDIA CUDA C++ Programming Guide," Version 12.3, 2023. [Online]. Available: \url{https://docs.nvidia.com/cuda/cuda-c-programming-guide/}
+
+\bibitem{cufft_lib}
+NVIDIA Corporation, "cuFFT Library User's Guide," 2023. [Online]. Available: \url{https://docs.nvidia.com/cuda/cufft/}
+
+\end{thebibliography}
+
+\end{document}
