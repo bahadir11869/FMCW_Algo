@@ -17,7 +17,7 @@
 
 \section{Introduction}
 \textbf{Problem Definition:}
-Frequency Modulated Continuous Wave (FMCW) radar systems require intensive signal processing steps, primarily Fast Fourier Transforms (FFT) and matrix transpositions, to determine the range and velocity of targets \cite{richards2014}. In real-time applications such as autonomous driving or drone navigation, these computations must be performed with extremely low latency. Standard CPU implementations often fail to meet these real-time constraints as the data resolution and radar channel count increase.
+Frequency Modulated Continuous Wave (FMCW) radar systems require intensive signal processing steps, primarily Fast Fourier Transforms (FFT) and matrix transpositions, to determine the range and velocity of targets \cite{richards2014}. Recent case studies highlight that offloading these large-scale FFT computations to Graphical Processing Units (GPUs) is essential to overcome CPU bottlenecks \cite{asoronye2024}. In real-time applications such as autonomous driving or drone navigation, these computations must be performed with extremely low latency. Standard CPU implementations often fail to meet these real-time constraints as the data resolution and radar channel count increase.
 
 \noindent
 \textbf{Motivation:}
@@ -26,7 +26,9 @@ The primary motivation is to leverage the massive parallelism of modern GPU arch
 \section{Related Work}
 The Fast Fourier Transform (FFT) is the core algorithm for radar signal processing. While the Cooley-Tukey algorithm is the standard for sequential processing \cite{cooley1965}, parallel implementations vary significantly based on hardware architecture.
 
-State-of-the-art solutions typically rely on vendor-optimized libraries like NVIDIA cuFFT \cite{cufft_lib} or Intel MKL. However, custom kernel implementations are crucial for understanding hardware limits as detailed in the CUDA Programming Guide \cite{cuda_guide}, and for optimizing specific pipeline stages where generic libraries might introduce overhead. Existing literature often compares CPU vs. GPU but rarely details the step-by-step impact of optimizations like register pressure reduction and shared memory banking on modern RTX series cards.
+State-of-the-art solutions typically rely on vendor-optimized libraries like NVIDIA cuFFT \cite{cufft_lib} or Intel MKL. However, custom kernel implementations are crucial for understanding hardware limits as detailed in the CUDA Programming Guide \cite{cuda_guide}, and for optimizing specific pipeline stages where generic libraries might introduce overhead.
+
+In the context of HPC advancements, Asoronye et al. presented case studies highlighting the efficiency of GPU acceleration for FFT operations. Their work confirms that utilizing parallel processing architectures provides substantial speedup for large-scale spectral analysis tasks compared to CPU-only approaches \cite{asoronye2024}.
 
 \section{Proposed Method}
 We propose a step-by-step optimization pipeline to parallelize the Range-Doppler map generation algorithm. The implementation stages are as follows:
@@ -58,18 +60,18 @@ Table \ref{tab:final_results} presents the execution times and bandwidth utiliza
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
 \textbf{Implementation} & \textbf{Compute (ms)} & \textbf{Total (ms)} & \textbf{Bandwidth (GB/s)} & \textbf{Speedup (vs CPU Rec.)} & \textbf{RMSE Error} \\ \midrule
-CPU Recursive           & 683.85                & $\sim$684           & N/A                       & 1x (Baseline)             & -                   \\
-CPU OpenMP              & 249.18                & 249.18              & N/A                       & 2.7x                      & -                   \\
-CPU AVX (Ref)           & 9.28                  & 9.28                & N/A                       & 74.5x                     & \textbf{Reference}  \\ \midrule
-GPU Global (Naive)      & 6.42                  & 9.85                & 2.61                      & 69.4x                     & N/A                 \\
-\textbf{GPU Shared (Custom)}     & \textbf{0.58}         & \textbf{4.32}       & \textbf{28.68}            & \textbf{158.3x}           & \textbf{0.001048}   \\
-GPU 1D FFT + Manual Transpose      & 0.32                  & 3.87                & 52.85                     & 176.7x                    & 0.000513            \\
-GPU cuFFT (Vendor)      & 0.25                  & 1.80                & 67.38                     & 380.0x                    & 0.000528            \\ \bottomrule
+CPU Recursive                  & 683.85 & $\sim$684 & N/A   & 1x (Baseline) & - \\
+CPU OpenMP                     & 249.18 & 249.18    & N/A   & 2.7x          & - \\
+CPU AVX (Ref)                  & 9.28   & 9.28      & N/A   & 74.5x         & \textbf{Reference} \\ \midrule
+GPU Global (Naive)             & 6.42   & 9.85      & 2.61  & 69.4x         & N/A \\
+GPU Shared (Custom)            & 0.58   & 4.32      & 28.68 & 158.3x        & 0.001048 \\
+GPU Shared with Stream         & 2.18   & 4.25      & 7.67  & 160.9x        & 0.001048 \\
+GPU 1D FFT + Manual Transpose  & 0.32   & 3.87      & 52.85 & 176.7x        & 0.000513 \\
+GPU cuFFT (Vendor)             & 0.25   & 1.80      & 67.38 & 380.0x        & 0.000528 \\ \bottomrule
 \end{tabular}
 }
 \end{table}
 
-% --- YENI EKLENEN GRAFIKLER BASLANGIC ---
 \begin{figure}[H]
     \centering
     % Grafik 1: Total Time
@@ -93,12 +95,13 @@ GPU cuFFT (Vendor)      & 0.25                  & 1.80                & 67.38   
     \caption{Scalability analysis of FMCW Radar Processing algorithms.}
     \label{fig:benchmark_plots}
 \end{figure}
-% --- YENI EKLENEN GRAFIKLER BITIS ---
 
 \subsection{Bandwidth \& Bottleneck Discussion}
 The naive GPU implementation suffered from uncoalesced memory access patterns, achieving only \textbf{2.61 GB/s}, which is less than 1\% of the RTX 3060's theoretical peak bandwidth (~360 GB/s). By utilizing Shared Memory to localize data on-chip, we achieved a \textbf{~11x improvement} in effective bandwidth (\textbf{28.68 GB/s}).
 
 It is observed that the \textbf{GPU 1D FFT + Manual Transpose} stage achieved significantly higher bandwidth (\textbf{52.85 GB/s}) compared to the full 2D FFT kernel. This is attributed to the lower arithmetic intensity of the transpose operation compared to the complex butterfly operations required for the full FFT. While the custom kernel is extremely fast (0.58 ms compute), the total time is dominated by PCIe transfer overhead ($\sim$3.7 ms), confirming that the system is now bandwidth-bound rather than compute-bound.
+
+This observation aligns with the findings of Ben-Asher et al. \cite{benasher2020}, who demonstrated that for data sizes smaller than a certain threshold, the PCIe transfer latency often negates the computational advantage of GPUs.
 
 \subsection{Validation (RMSE and Visual Analysis)}
 To ensure the correctness of the parallel algorithms, we calculated the Root Mean Square Error (RMSE) against the CPU AVX output.
@@ -143,17 +146,23 @@ The following steps are planned to be accomplished before submitting the final r
 
 \begin{thebibliography}{9}
 
+\bibitem{richards2014}
+M. A. Richards, \textit{Fundamentals of Radar Signal Processing}, 2nd ed. New York, NY, USA: McGraw-Hill Education, 2014.
+
+\bibitem{asoronye2024}
+G. O. Asoronye, J. E. Okorie, A. C. Onuora, and E. Okekenwa, ``Advancements in High-Performance Computing: Case Studies in Fast Fourier Transform with Graphical Processing Unit Acceleration,'' in \textit{2024 IEEE 5th International Conference on Electro-Technology for National Development (NIGERCON)}, Nsukka, Nigeria, 2024, pp. 1-6.
+
 \bibitem{cooley1965}
 J. W. Cooley and J. W. Tukey, "An algorithm for the machine calculation of complex Fourier series," \textit{Mathematics of Computation}, vol. 19, no. 90, pp. 297–301, 1965.
 
-\bibitem{richards2014}
-M. A. Richards, \textit{Fundamentals of Radar Signal Processing}, 2nd ed. New York, NY, USA: McGraw-Hill Education, 2014.
+\bibitem{cufft_lib}
+NVIDIA Corporation, "cuFFT Library User's Guide," 2023. [Online]. Available: \url{https://docs.nvidia.com/cuda/cufft/}
 
 \bibitem{cuda_guide}
 NVIDIA Corporation, "NVIDIA CUDA C++ Programming Guide," Version 12.3, 2023. [Online]. Available: \url{https://docs.nvidia.com/cuda/cuda-c-programming-guide/}
 
-\bibitem{cufft_lib}
-NVIDIA Corporation, "cuFFT Library User's Guide," 2023. [Online]. Available: \url{https://docs.nvidia.com/cuda/cufft/}
+\bibitem{benasher2020}
+Y. Ben-Asher, G. Haber, and V. Meisels, "Performance Analysis of FFT on CPU and GPU," in \textit{2020 IEEE International Conference on Parallel and Distributed Systems (ICPADS)}, pp. 460-468, 2020.
 
 \end{thebibliography}
 

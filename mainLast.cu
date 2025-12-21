@@ -1,4 +1,4 @@
-// nvcc -arch=sm_86 -std=c++17 -O3 --ptxas-options=-v  mainLast.cu --options-file compile2.txt
+// nvcc -arch=sm_86 -std=c++17 -O3  mainLast.cu --options-file compile2.txt;.\FMCW_Algo2.exe
 #include "defines.h"
 #include "GPU_FMCW/gpu_fmcw.h"
 #include "CPU_FMCW/cpu_fmcw.h"
@@ -112,16 +112,23 @@ int main()
     cpuFMCWManuel.getCpuTime(), cpuFMCWOpenMP.getCpuTime(), cpuFMCWAVX.getCpuTime());
     
     printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR CPU AVX vs GPU  --------- \n\n");
+
+    printf("GPUManuelFFTGlobal vs AVX RMSE \n");        
+    calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpuManuelNoSHM.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
+    
+    printf("GPUManuelFFTSharedMemStream vs AVX RMSE \n");        
+    calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpuManuelSHMStream.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
+
     printf("GPUManuelFFTSharedMem vs AVX RMSE \n");
     calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpuManuelSHM.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
 
     printf("GPUManuelFFTStream vs AVX RMSE \n");
     calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpuManuelSHMStream.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
     
-    printf("\nGpuManuelTranspose vs AVX RMSE \n");
+    printf("GpuManuelTranspose vs AVX RMSE \n");
     calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpu1DCufftManuelTranspose.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
 
-    printf("\nGpu2D vs AVX RMSE \n");
+    printf("Gpu2D vs AVX RMSE \n");
     calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpu2DFFT.getOutput(), NUM_SAMPLES, NUM_CHIRPS, true);  
 
     

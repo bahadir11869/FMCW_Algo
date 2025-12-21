@@ -16,7 +16,7 @@
 namespace fs = std::filesystem;
 
 const int NUM_CHIRPS = 2048;      // Slow Time (Y)
-const int NUM_SAMPLES = 2048;     // Fast Time (X)
+const int NUM_SAMPLES = 1024;     // Fast Time (X)
 const int TOTAL_SIZE = NUM_CHIRPS * NUM_SAMPLES;
 const int TILE_DIM = 32;         // GPU Blok Boyutu
 
@@ -293,6 +293,7 @@ inline void dosyayaYaz(const char* cpDosyaIsmi, std::vector<Complex> vResult, st
 
 inline void save_rdm_data(const char* filename, const std::vector<Complex>& gpu_result, bool is_input_transposed)
 {
+    fs::remove(filename);
     FILE* fp = fopen(filename, "w");
     if (!fp) {
         std::cerr << "Dosya acilamadi: " << filename << std::endl;
