@@ -2,7 +2,7 @@ CPU_FMCW/cpu_fmcw.cpp
 GPU_FMCW/gpu_fmcw.cu
 KERNEL_FMCW/kernels.cu
 -lcufft
--Xcompiler "/openmp"
+-Xcompiler "/openmp:llvm"
 -I "deps/mkl/include"
 -L "deps/mkl/lib"
 -lmkl_intel_lp64

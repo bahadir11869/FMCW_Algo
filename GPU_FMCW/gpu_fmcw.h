@@ -15,7 +15,9 @@ private:
     std::vector<Complex> output;
     
     cuComplex *d_data;
+    cuComplex *d_data_all;
     cuComplex *d_transposed;
+    cuComplex *d_transposed_all;
 
     cudaEvent_t start, stop; 
     cudaEvent_t start2, stop2; 

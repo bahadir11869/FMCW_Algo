@@ -12,12 +12,16 @@
 #include <thread> // Sleep için gerekli
 #include <filesystem>
 #include <math.h>
+#include <fstream>
 
 namespace fs = std::filesystem;
-
-const int NUM_CHIRPS = 2048;      // Slow Time (Y)
-const int NUM_SAMPLES = 1024;     // Fast Time (X)
+const int NUM_TX = 2;
+const int NUM_RX = 4;
+const int NUM_CHIRPS = 256;      // Slow Time (Y)
+const int NUM_SAMPLES = 128;     // Fast Time (X)
+const int NUM_CHANNELS = NUM_TX * NUM_RX; 
 const int TOTAL_SIZE = NUM_CHIRPS * NUM_SAMPLES;
+const int TOTAL_ELEMENTS = TOTAL_SIZE * NUM_TX * NUM_RX;
 const int TILE_DIM = 32;         // GPU Blok Boyutu
 
 // Radar Fizigi
@@ -99,6 +103,16 @@ inline void calculate_RMSE_Vectors(const std::vector<T>& cpu_vec,
     }
 
     std::cout <<"RMSE : " << std::sqrt(total_sq_error / total_elements) << std::endl;
+}
+
+inline void readBin(std::string binDosyasi, std::vector<Complex>& inputData)
+{
+
+    std::ifstream rf(binDosyasi, std::ios::out | std::ios::binary);
+    if(!rf) 
+        return;
+    rf.read((char*)inputData.data(), inputData.size() * sizeof(Complex));
+    rf.close();    
 }
 
 inline void veriUret( std::vector<Complex>& inputData, std::vector<stTarget>targets)

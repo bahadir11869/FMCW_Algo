@@ -14,6 +14,55 @@ __global__ void transpose_optimized_kernel(cuComplex* input, cuComplex* output, 
     if (x < height && y < width) output[y * height + x] = tile[threadIdx.x][threadIdx.y];
 }
 
+__global__ void transpose_multi_channel_kernel(cuComplex* idata, cuComplex* odata, int width, int height) {
+    // 1. Kanal Ofsetini Hesapla (MIMO için en önemli kısım)
+    // Her kanalın verisi bellekte ardışık: ChannelSize = width * height
+    int ch = blockIdx.z; 
+    int channel_offset = ch * width * height;
+
+    // İşlem yapılacak kanalın başlangıç adreslerini belirle
+    cuComplex* current_idata = idata + channel_offset;
+    cuComplex* current_odata = odata + channel_offset;
+
+    // 2. Shared Memory Tanımla (Bank conflict önlemek için +1 padding)
+    __shared__ cuComplex tile[TILE_DIM][TILE_DIM + 1];
+
+    // 3. Global Memory -> Shared Memory (Okuma)
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+
+    for (int j = 0; j < TILE_DIM; j += NUM_CHANNELS) {
+        if (x < width && (y + j) < height) {
+            tile[threadIdx.y + j][threadIdx.x] = current_idata[(y + j) * width + x];
+        }
+    }
+
+    __syncthreads();
+
+    // 4. Shared Memory -> Global Memory (Yazma - Transpoze edilmiş halde)
+    // Yeni x ve y koordinatlarını transpoze ederek hesapla
+    x = blockIdx.y * TILE_DIM + threadIdx.x;  // Orijinal y blok indisi
+    y = blockIdx.x * TILE_DIM + threadIdx.y;  // Orijinal x blok indisi
+
+    for (int j = 0; j < TILE_DIM; j += NUM_CHANNELS) {
+        if (x < height && (y + j) < width) {
+            current_odata[(y + j) * height + x] = tile[threadIdx.x][threadIdx.y + j];
+        }
+    }
+}
+
+__global__ void sumChannelsKernel(cuComplex* d_all_channels, cuComplex* d_output_sum, int num_channels, int channel_size) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < channel_size) {
+        cuComplex sum = make_cuComplex(0.0f, 0.0f);
+        for (int ch = 0; ch < num_channels; ++ch) {
+            cuComplex val = d_all_channels[ch * channel_size + idx];
+            sum.x += val.x; // Real
+            sum.y += val.y; // Imag
+        }
+        d_output_sum[idx] = sum;
+    }
+}
 
 __device__ unsigned int gpu_bit_reverse(unsigned int k, int num_bits) {
     unsigned int r = 0;

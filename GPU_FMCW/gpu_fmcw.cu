@@ -13,9 +13,12 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
     cudaEventCreate(&stop2);
     this->fftType = fftType;
     gpuErrchk(cudaMalloc(&d_data, TOTAL_SIZE * sizeof(cuComplex))); 
+    gpuErrchk(cudaMalloc(&d_data_all, TOTAL_ELEMENTS * sizeof(cuComplex))); 
+    gpuErrchk(cudaMalloc(&d_transposed, TOTAL_SIZE * sizeof(cuComplex)));    
     log2_samples = (int)log2((double)NUM_SAMPLES);
     log2_chirps  = (int)log2((double)NUM_CHIRPS);
     output.resize(TOTAL_SIZE);   
+    gpuErrchk(cudaMalloc(&d_transposed_all, TOTAL_ELEMENTS * sizeof(cuComplex)));    
     for (int i = 0; i < 4; ++i) 
     {
         cudaStreamCreate(&streams[i]);
@@ -25,15 +28,16 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
     {
         cufftPlan1d(&planRange, NUM_SAMPLES, CUFFT_C2C, NUM_CHIRPS);
         cufftPlan1d(&planDoppler, NUM_CHIRPS, CUFFT_C2C, NUM_SAMPLES);
-        gpuErrchk(cudaMalloc(&d_transposed, TOTAL_SIZE * sizeof(cuComplex)));    
+       
     }
     else
     {
-        if (cufftPlan2d(&plan, NUM_CHIRPS, NUM_SAMPLES, CUFFT_C2C) != CUFFT_SUCCESS) 
-        {
-            std::cerr << "CUFFT Plan Hatasi!" << std::endl;
-            exit(1);    
-        }
+        int n[2] = {NUM_CHIRPS, NUM_SAMPLES};
+        cufftPlanMany(&plan, 2, n, 
+                NULL, 1, TOTAL_SIZE, // Input layout
+                NULL, 1, TOTAL_SIZE, // Output layout
+                CUFFT_C2C, NUM_CHANNELS); // 8 Adet (Batch)
+
     }    
 }
 
@@ -41,6 +45,7 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
 gpu_fmcw::~gpu_fmcw()
 {
     cudaFree(d_data);    
+    cudaFree(d_data_all);
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
     cudaEventDestroy(start2);
@@ -123,13 +128,11 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Yok(std::vector<Complex>& input)
 
 void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input)
 {
-    size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
-    if(input.size() != TOTAL_SIZE) output.resize(TOTAL_SIZE);
-    
+    size_t sizeBytes = TOTAL_ELEMENTS * sizeof(cuComplex);
     cudaEventRecord(start);
 
     // 1. Host -> Device
-    gpuErrchk(cudaMemcpy(d_data, input.data(), sizeBytes, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(d_data_all, input.data(), sizeBytes, cudaMemcpyHostToDevice));
     
     cudaEventRecord(start2);
 
@@ -139,16 +142,20 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input)
     // Shared Memory Boyutu: N * sizeof(cuComplex) -> 1024 * 8 = 8KB (Yeterli)
     
     int threadsPerBlock = NUM_SAMPLES / 2;
-    int numBlocks = NUM_CHIRPS;
+    int numBlocks = NUM_CHIRPS * NUM_CHANNELS;
     int sharedMemSize = NUM_SAMPLES * sizeof(cuComplex);
 
-    k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_data, NUM_SAMPLES, log2_samples);
-    gpuErrchk(cudaGetLastError()); // Hata kontrolü
+    k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_data_all, NUM_SAMPLES, log2_samples);
 
-    // 3. Transpose (Mevcut kerneliniz çok iyi, aynen kalsın)
-    dim3 threads(TILE_DIM, TILE_DIM);
-    dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
-    transpose_optimized_kernel<<<blocks, threads>>>(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS);
+    dim3 threads(TILE_DIM, NUM_CHANNELS);
+    // Grid'in Z boyutuna kanal sayısını ekliyoruz
+    dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, 
+                (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM, 
+                NUM_CHANNELS);
+
+    // Not: Transpose kernel'ınızın içinde d_data_all + blockIdx.z * TOTAL_SIZE ofsetini kullanmalısınız
+    transpose_multi_channel_kernel<<<blocks, threads>>>(d_data_all, d_transposed_all, NUM_SAMPLES, NUM_CHIRPS);
+
 
     // 4. Doppler FFT (Shared Memory Optimized)
     // Artık veri d_transposed içinde [Sample][Chirp] şeklinde.
@@ -157,7 +164,7 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input)
     // Blok sayısı = NUM_SAMPLES (1024 tane satır işleyeceğiz).
     
     threadsPerBlock = NUM_CHIRPS / 2; 
-    numBlocks = NUM_SAMPLES;
+    numBlocks = NUM_SAMPLES * NUM_CHANNELS;
     sharedMemSize = NUM_CHIRPS * sizeof(cuComplex); // 16KB (Bu da sığar)
 
     // Doppler FFT'yi transpoze edilmiş veri üzerinde çalıştırıyoruz
@@ -166,15 +173,25 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input)
     // Ama kernel d_data üzerinde çalışsın istiyorsak parametreleri değiştirebiliriz.
     // Basitlik için d_transposed üzerinde yapıp sonucu ordan alalım.
     
-    k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_transposed, NUM_CHIRPS, log2_chirps);
-    gpuErrchk(cudaGetLastError());
+    k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_transposed_all, NUM_CHIRPS, log2_chirps);
+
+    int threadsSum = 256;
+    int blocksSum = (TOTAL_SIZE + threadsSum - 1) / threadsSum;
+    
+    // Daha önce yazdığımız toplama kernel'ı
+    sumChannelsKernel<<<blocksSum, threadsSum>>>(
+        d_transposed_all, 
+        d_data, 
+        NUM_CHANNELS, 
+        TOTAL_SIZE
+    );
 
     cudaEventRecord(stop2);
     cudaEventSynchronize(stop2);
 
     // 5. Device -> Host
     // Sonuç d_transposed içinde kaldı.
-    gpuErrchk(cudaMemcpy(output.data(), d_transposed, sizeBytes, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(output.data(), d_data, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -276,21 +293,27 @@ void gpu_fmcw::run_gpu_manuel_transpose(std::vector<Complex>& input)
 
 void gpu_fmcw::run_gpu_2DFFT(Complex* input, Complex* ptroutput)
 {
-    size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
+    size_t sizeBytes = TOTAL_ELEMENTS * sizeof(cuComplex);
 
     // --- KRITIK BOLGE BASLANGIC ---
     cudaEventRecord(start);
 
     // 1. Veri Transferi (Host -> Device)
     // Pinned memory olduğu için çok daha hızlıdır.
-    gpuErrchk(cudaMemcpy(d_data, input, sizeBytes, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(d_data_all, input, sizeBytes, cudaMemcpyHostToDevice));
     cudaEventRecord(start2);
     // 2. 2D FFT (Hem Range hem Doppler işlemini ve Transpose mantığını içerir)
-    cufftExecC2C(plan, d_data, d_data, CUFFT_FORWARD);
+    cufftExecC2C(plan, d_data_all, d_data_all, CUFFT_FORWARD);
     cudaEventRecord(stop2);
     cudaEventSynchronize(stop2);
     // 3. Veri Transferi (Device -> Host)
-    gpuErrchk(cudaMemcpy(ptroutput, d_data, sizeBytes, cudaMemcpyDeviceToHost));
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (TOTAL_SIZE + threadsPerBlock - 1) / threadsPerBlock;
+    sumChannelsKernel<<<blocksPerGrid, threadsPerBlock>>>(
+        d_data_all, d_data, NUM_CHANNELS, TOTAL_SIZE
+    );
+
+    gpuErrchk(cudaMemcpy(ptroutput, d_data, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
 
     cudaEventRecord(stop);
     // --- KRITIK BOLGE BITIS ---
@@ -300,7 +323,11 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, Complex* ptroutput)
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
     vfgpuTime.push_back(fgpuTime);
     vfgpuComputeTime.push_back(fgpuComputeTime);
-    memcpy(output.data(), ptroutput, sizeBytes);
+    dim3 threads(TILE_DIM, TILE_DIM);
+    dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
+    transpose_optimized_kernel<<<blocks, threads>>>(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS);
+    gpuErrchk(cudaMemcpy(output.data(), d_transposed, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
+    //memcpy(output.data(), ptroutput, TOTAL_SIZE * sizeof(Complex));
 }
 
 

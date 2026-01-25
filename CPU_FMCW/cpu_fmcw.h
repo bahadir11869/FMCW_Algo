@@ -1,5 +1,6 @@
 #pragma once
 #include "../defines.h"
+#include <mkl.h>
 
 class cpu_fmcw
 {
@@ -9,6 +10,9 @@ private:
     std::vector<float> vfcpuTime;
     std::string strDosyaAdi;
     std::vector<Complex> output;
+    DFTI_DESCRIPTOR_HANDLE handRange;
+    DFTI_DESCRIPTOR_HANDLE handDoppler;
+    Complex* all_transposed;
 
 
 public:
