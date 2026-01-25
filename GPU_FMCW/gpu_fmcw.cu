@@ -315,18 +315,19 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, Complex* ptroutput)
 
     gpuErrchk(cudaMemcpy(ptroutput, d_data, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
 
-    cudaEventRecord(stop);
-    // --- KRITIK BOLGE BITIS ---
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&fgpuTime, start, stop);
+
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
-    vfgpuTime.push_back(fgpuTime);
     vfgpuComputeTime.push_back(fgpuComputeTime);
     dim3 threads(TILE_DIM, TILE_DIM);
     dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
     transpose_optimized_kernel<<<blocks, threads>>>(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS);
     gpuErrchk(cudaMemcpy(output.data(), d_transposed, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
+    cudaEventRecord(stop);
+    // --- KRITIK BOLGE BITIS ---
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&fgpuTime, start, stop);
+    vfgpuTime.push_back(fgpuTime);
     //memcpy(output.data(), ptroutput, TOTAL_SIZE * sizeof(Complex));
 }
 

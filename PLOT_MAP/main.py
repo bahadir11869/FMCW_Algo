@@ -53,7 +53,7 @@ def create_figure_for_file(filename, custom_title="RDM Plot"):
     extent_vals = [0, max_range, -max_vel, max_vel]
 
     # 4. Çizim
-    plt.imshow(data_db, aspect='auto', cmap='jet', origin='lower', extent=extent_vals)
+    plt.imshow(data_db.T, aspect='auto', cmap='jet', origin='lower', extent=extent_vals)
     
     plt.title(f"{custom_title}\n(Res: {RANGE_RES:.2f} m, {VELOCITY_RES:.2f} m/s)")
     plt.xlabel("Range (m)")
