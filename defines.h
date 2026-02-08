@@ -305,7 +305,7 @@ inline void dosyayaYaz(const char* cpDosyaIsmi, std::vector<Complex> vResult, st
 }
 
 
-inline void save_rdm_data(const char* filename, const std::vector<Complex>& gpu_result, bool is_input_transposed)
+inline void save_rdm_data(const char* filename, float* gpu_result, bool is_input_transposed)
 {
     fs::remove(filename);
     FILE* fp = fopen(filename, "w");
@@ -338,9 +338,9 @@ inline void save_rdm_data(const char* filename, const std::vector<Complex>& gpu_
             }
 
             // Genlik hesapla
-            float amp = std::abs(gpu_result[idx]);
+            //float amp = std::abs(gpu_result[idx]);
             
-            fprintf(fp, "%.4f", amp);
+            fprintf(fp, "%.4f", gpu_result[idx]);
             if (r < NUM_SAMPLES - 1) fprintf(fp, ",");
         }
         fprintf(fp, "\n"); // Satır bitti, alta geç

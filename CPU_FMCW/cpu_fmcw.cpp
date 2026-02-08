@@ -26,6 +26,10 @@ cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
     DftiCommitDescriptor(handDoppler);
 
     Complex* all_transposed = nullptr;
+    
+    sumVector = new float[TOTAL_SIZE];
+    printf("Sumvector 0 : %f", sumVector[0]);
+    memset(sumVector, 0.0, TOTAL_SIZE);
 }
 
 cpu_fmcw::~cpu_fmcw()
@@ -104,59 +108,13 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
 
             // İmajiner değerleri koruyarak ana output'a ekle (Coherent Sum)
             #pragma omp critical
-            for(int j = 0; j < NUM_CHIRPS; ++j) {
-                output[i * NUM_CHIRPS + j] += row[j];
+            for(int j=0; j<NUM_CHIRPS; ++j) 
+            {
+                sumVector[i * NUM_CHIRPS + j] += std::abs(row[j]);
             }
         }
     }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
-    vfcpuTime.push_back(fcpuTime);
-}
-
-void cpu_fmcw::run_cpu_openmp(const std::vector<Complex>& input) 
-{
-    std::vector<Complex> data = input;
-    output.resize(TOTAL_SIZE);
-    
-    auto start = std::chrono::high_resolution_clock::now();
-
-    // 1. RANGE FFT (OpenMP Parallel For)
-    #pragma omp parallel for
-    for (int i = 0; i < NUM_CHIRPS; ++i) 
-    {
-        std::vector<Complex> row(NUM_SAMPLES);
-        for(int j=0; j<NUM_SAMPLES; ++j) 
-            row[j] = data[i * NUM_SAMPLES + j];
-        cpu_recursive_fft(row);
-        for(int j=0; j<NUM_SAMPLES; ++j)
-            data[i * NUM_SAMPLES + j] = row[j];
-    }
-
-    // 2. TRANSPOSE (OpenMP Collapse)
-    std::vector<Complex> transposed(TOTAL_SIZE);
-    #pragma omp parallel for collapse(2)
-    for (int i = 0; i < NUM_CHIRPS; ++i) 
-    {
-        for (int j = 0; j < NUM_SAMPLES; ++j) 
-        {
-            transposed[j * NUM_CHIRPS + i] = data[i * NUM_SAMPLES + j];
-        }
-    }
-
-    // 3. DOPPLER FFT (OpenMP Parallel For)
-    #pragma omp parallel for
-    for (int i = 0; i < NUM_SAMPLES; ++i) 
-    {
-        std::vector<Complex> row(NUM_CHIRPS);
-        for(int j=0; j<NUM_CHIRPS; ++j) 
-            row[j] = transposed[i * NUM_CHIRPS + j];
-        cpu_recursive_fft(row);
-        for(int j=0; j<NUM_CHIRPS; ++j) 
-            output[i * NUM_CHIRPS + j] = row[j];
-    }
-
+    printf("CPU basic bitt, \n");
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     vfcpuTime.push_back(fcpuTime);
@@ -185,20 +143,24 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
     DftiComputeForward(handDoppler, (void*)all_transposed);
     // 4. Coherent Summation
     std::memset(ptroutput, 0, TOTAL_SIZE * sizeof(Complex));
+     float temp = 0.0; 
     #pragma omp parallel for
     for (int n = 0; n < TOTAL_SIZE; ++n) {
         Complex sum(0, 0);
+        
+       
         for (int ch = 0; ch < NUM_CHANNELS; ++ch) {
-            sum += all_transposed[ch * TOTAL_SIZE + n];
+            temp += std::abs(all_transposed[ch * TOTAL_SIZE + n]);
         }
-        ptroutput[n] = sum;
+        sumVector[n] = temp;
+        temp = 0.0;
     }
 
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     vfcpuTime.push_back(fcpuTime);
-    if(output.size() != TOTAL_SIZE) output.resize(TOTAL_SIZE);
-    std::memcpy(output.data(), ptroutput, TOTAL_SIZE * sizeof(Complex));
+    //if(output.size() != TOTAL_SIZE) output.resize(TOTAL_SIZE);
+    //std::memcpy(output.data(), ptroutput, TOTAL_SIZE * sizeof(Complex));
 }
 
 float cpu_fmcw::getCpuTime()
@@ -216,7 +178,7 @@ std::string cpu_fmcw::getFileName()
     return strDosyaAdi;
 }
 
-std::vector<Complex> cpu_fmcw::getOutput()
+float* cpu_fmcw::getOutput()
 {
-    return output;
+    return sumVector;
 }

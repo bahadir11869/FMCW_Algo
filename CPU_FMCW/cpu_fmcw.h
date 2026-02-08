@@ -13,6 +13,7 @@ private:
     DFTI_DESCRIPTOR_HANDLE handRange;
     DFTI_DESCRIPTOR_HANDLE handDoppler;
     Complex* all_transposed;
+    float* sumVector;
 
 
 public:
@@ -24,6 +25,6 @@ public:
 
     float getCpuTime();
     std::string getFileName();
-    std::vector<Complex> getOutput();
+    float* getOutput();
 };
 

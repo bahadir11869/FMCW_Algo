@@ -14,6 +14,8 @@ private:
     std::vector<float> vfgpuComputeTime;
     std::vector<Complex> output;
     
+    float* f_data;
+    float* f_data_host;
     cuComplex *d_data;
     cuComplex *d_data_all;
     cuComplex *d_transposed;
@@ -40,14 +42,14 @@ public:
     ~gpu_fmcw();
     void run_gpu_manuel_transpose(std::vector<Complex>& input);
     void run_gpu_manuel_FFT_Shared_Yok(std::vector<Complex>& input);
-    void run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input);
-    void run_gpu_2DFFT(Complex* input, Complex* ptroutput);
+    void run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float* fOutput);
+    void run_gpu_2DFFT(Complex* input, float* ptroutput);
     void run_gpu_streams(Complex* h_input, Complex* h_output);
 
     float getGpuTime();
     float getGpuComputeTime();
     std::string getDosyaAdi();
-    std::vector<Complex> getOutput();
+    float* getOutput();
 
 
 };
