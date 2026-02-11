@@ -21,6 +21,7 @@ int main()
     gpuErrchk(cudaMallocHost((void**)&h_pinned_outputCPU, TOTAL_SIZE * sizeof(Complex)));
     gpuErrchk(cudaMallocHost((void**)&h_pinned_outputGPU, TOTAL_SIZE * sizeof(float)));
     long long transferred_bytes = TOTAL_SIZE * sizeof(float) + TOTAL_ELEMENTS * sizeof(float);
+    std::vector<float> detectionMap(TOTAL_SIZE);
 
     readBin("radar_raw_frameBin/000006.bin", fullData);
     /*
@@ -57,7 +58,20 @@ int main()
     }
     fclose(file12);
 
-    std::vector<float> detectionMap(TOTAL_SIZE);
+    memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
+    gpu_fmcw gpu2DFFT(2,"GPU_FMCW/2DFFT.txt");
+
+    for(int i = 0; i < iTekrarSayisi; i++)
+    {
+        gpu2DFFT.run_gpu_2DFFT(h_pinned_input, h_pinned_outputGPU);
+        gpuErrchk(cudaDeviceSynchronize());
+    }
+    for(int i=0; i<TOTAL_SIZE; ++i) {
+    detectionMap[i] = (gpu2DFFT.bpCFAR[i]) ? 1.0f : 0.0f;
+    }
+    
+    save_rdm_data("GPU_FMCW/radar_mask_2DFFT.csv", detectionMap.data(), true);
+    save_rdm_data("GPU_FMCW/2DFFT.csv", gpu2DFFT.getOutput(), true);
 
     for(int i=0; i<TOTAL_SIZE; ++i) {
     detectionMap[i] = (gpuManuelSHM.bpCFAR[i]) ? 1.0f : 0.0f;

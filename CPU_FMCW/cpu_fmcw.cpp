@@ -118,10 +118,14 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
             }
         }
     }
-    printf("CPU basic bitt, \n");    
+    printf("CPU basic bitt, \n");   
+    auto cfar = std::chrono::high_resolution_clock::now(); 
     cpu_sat.process(cfarData);
+    auto cfar_end = std::chrono::high_resolution_clock::now(); 
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
+    float cfarTime =  std::chrono::duration<float, std::milli>(cfar_end - cfar).count();
+    printf("CPU total time %f  cfar time %f\n", fcpuTime, cfarTime);
     vfcpuTime.push_back(fcpuTime);
 }
 

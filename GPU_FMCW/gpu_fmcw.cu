@@ -146,7 +146,7 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     // 1. Host -> Device
     gpuErrchk(cudaMemcpy(d_data_all, input.data(), sizeBytes, cudaMemcpyHostToDevice));
     
-    cudaEventRecord(start2);
+
 
     // --- RANGE FFT (Shared Memory Optimized) ---
     // Her blok 1 Chirp işleyecek. (NUM_CHIRPS tane blok)
@@ -199,8 +199,7 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
         TOTAL_SIZE
     );
     //printf("Basladi 32\n");
-    cudaEventRecord(stop2);
-    cudaEventSynchronize(stop2);
+
 
     // 5. Device -> Host
     // Sonuç d_transposed içinde kaldı.
@@ -208,17 +207,12 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     //gpuErrchk(cudaMemcpy(fOutput, f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
     
     //cudaMemcpy(cfarData.power.data(), f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToDevice);
-
+    cudaEventRecord(start2);
     cfarProcessor.process(cfarParam, fpCfarData, bpCfarData);
-    
+    cudaEventRecord(stop2);
+    cudaEventSynchronize(stop2);
     cudaMemcpy(bpCFAR, bpCfarData, TOTAL_SIZE * sizeof(bool), cudaMemcpyDeviceToHost);
-    
-    // 5. CFAR İŞLEMİ (GPUCFAR_SAT)
-    // ---------------------------------------------------------
 
-
-
-    //printf("Basladi 34\n");
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&fgpuTime, start, stop);
@@ -349,11 +343,14 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
     transpose_multi_channel_kernel<<<blocks, threads>>>(d_data_all, d_transposed_all, NUM_SAMPLES, NUM_CHIRPS);
 
     sumChannelsKernel<<<blocksPerGrid, threadsPerBlock>>>(
-        d_transposed_all, f_data, NUM_CHANNELS, TOTAL_SIZE
+        d_transposed_all, fpCfarData, NUM_CHANNELS, TOTAL_SIZE
     );
 
+    cfarProcessor.process(cfarParam, fpCfarData, bpCfarData);
+    cudaMemcpy(bpCFAR, bpCfarData, TOTAL_SIZE * sizeof(bool), cudaMemcpyDeviceToHost);
 
-    gpuErrchk(cudaMemcpy(ptroutput, f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+
+    gpuErrchk(cudaMemcpy(ptroutput, fpCfarData, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
 
 
 
