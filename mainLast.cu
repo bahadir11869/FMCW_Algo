@@ -84,13 +84,13 @@ int main()
     }
     save_rdm_data("CPU_FMCW/radar_mask_duz_FMCW.csv", detectionMap.data(), true);
     save_rdm_data("CPU_FMCW/duz_FMCW.csv", cpuFMCWManuel.getOutput(), true);
+
     /*
     cpu_fmcw cpuFMCWAVX("CPU_FMCW/cpu_AVX.txt");
     memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
     cpuFMCWAVX.run_cpu_avx(h_pinned_input, h_pinned_outputCPU);
     
     printf("\nCPU AVX Total time: %f\n", cpuFMCWAVX.getCpuTime());
-
 
 
     for(int i=0; i<TOTAL_SIZE; ++i) 

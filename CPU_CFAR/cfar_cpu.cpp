@@ -52,7 +52,7 @@ CFARStats CPUCFAR::process(const CFARData& d) {
             //printf("thr:%f, cur:%f\n", thr, cur);
             if(cur > thr) {
                 d.truth[idx(r, c, cols)] = true;
-                printf("column: %d, row:   %d idx: %d\n", c, r, idx(r, c, cols));
+                //printf("column: %d, row:   %d idx: %d\n", c, r, idx(r, c, cols));
             }
             else{
 

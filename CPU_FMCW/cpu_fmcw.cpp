@@ -3,9 +3,8 @@
 
 
 CFARParams p;
-CFARParams p2;
 CPUCFAR cpu_sat(p);
-//AVXCFAR avxcfar(p2);
+AVXCFAR avxcfar(p);
 
 cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
 {
@@ -33,9 +32,7 @@ cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
     
     sumVector = new float[TOTAL_SIZE];
     printf("Sumvector 0 : %f", sumVector[0]);
-    memset(sumVector, 0.0, TOTAL_SIZE);
-
-    cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
+    memset(sumVector, 0.0, TOTAL_SIZE);    
     cfarData.truth = new bool[TOTAL_SIZE];
 }
 
@@ -123,6 +120,7 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
     }
     //printf("CPU basic bitt, \n");   
     auto cfar = std::chrono::high_resolution_clock::now(); 
+    cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     cpu_sat.process(cfarData);
     auto cfar_end = std::chrono::high_resolution_clock::now(); 
     auto end = std::chrono::high_resolution_clock::now();
@@ -167,7 +165,8 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
         sumVector[n] = temp;
         temp = 0.0;
     }
-    //avxcfar.process(cfarData);
+    cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
+    avxcfar.process(cfarData);
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     vfcpuTime.push_back(fcpuTime);
