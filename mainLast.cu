@@ -84,7 +84,7 @@ int main()
     cpuFMCWManuel.run_cpu_basic(fullData);                
 
     FILE* file13 = fopen("CPU_FMCW/duzFFT.txt", "w+");
-    printf("CPU Basic %f \n", cpuFMCWManuel.getOutput()[1]);
+    //printf("CPU Basic %f \n", cpuFMCWManuel.getOutput()[1]);
     for (int i = 0; i < TOTAL_SIZE; ++i) {
         fprintf(file13, "genlik:  %f\n", cpuFMCWManuel.getOutput()[i]);
     }
@@ -96,6 +96,7 @@ int main()
     save_rdm_data("CPU_FMCW/duz_FMCW.csv", cpuFMCWManuel.getOutput(), true);
 
     printf("GPU Manuel FFT Shared Mem: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));    
+    printf("2D_FFT Compute time: %f ms total time: %f ms bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
     printf("CPU Recurisive FFT OpenMP time: %f\n", cpuFMCWManuel.getCpuTime());
 
     /*
