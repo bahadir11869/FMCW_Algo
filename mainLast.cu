@@ -58,7 +58,11 @@ int main()
     }
     fclose(file12);
 
-    save_rdm_data("GPU_FMCW/radar_mask_ManuelSHM.csv", (float*)gpuManuelSHM.bpCFAR, true);
+    std::vector<float> detectionMap(TOTAL_SIZE);
+    for(int i=0; i<TOTAL_SIZE; ++i) {
+    detectionMap[i] = (gpuManuelSHM.bpCFAR[i]) ? 1.0f : 0.0f;
+    }
+    save_rdm_data("GPU_FMCW/radar_mask_ManuelSHM.csv", detectionMap.data(), true);
     printf("Burada 3\n");
     save_rdm_data("GPU_FMCW/ManuelSHM.csv", gpuManuelSHM.getOutput(), true);
     printf("Burada 4\n");

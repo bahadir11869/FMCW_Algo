@@ -15,8 +15,8 @@ def load_radar_data(filename):
         return None
 
 # 1. Verileri Yükle
-power_map = load_radar_data("../GPU_FMCW/ManuelSHM.csv")
-mask_map = load_radar_data("../GPU_FMCW/radar_mask_ManuelSHM.csv")
+power_map = load_radar_data("../GPU_FMCW/2DFFT_GPU.csv")
+mask_map = load_radar_data("../GPU_FMCW/radar_mask.csv")
 
 if power_map is not None and mask_map is not None:
     

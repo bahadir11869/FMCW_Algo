@@ -54,10 +54,12 @@ __global__ void transpose_multi_channel_kernel(cuComplex* idata, cuComplex* odat
 __global__ void sumChannelsKernel(cuComplex* d_all_channels, float* d_output_sum, int num_channels, int channel_size) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     float fToplam = 0.0;
+    float norm = 0.0;
     if (idx < channel_size) {
         for (int ch = 0; ch < num_channels; ++ch) {
             cuComplex val = d_all_channels[ch * channel_size + idx];
-            fToplam += cuCabsf(val);
+            norm = cuCrealf(val) * cuCrealf(val) + cuCimagf(val) * cuCimagf(val);
+            fToplam += norm;
         }
         d_output_sum[idx] = fToplam;
     }

@@ -148,11 +148,7 @@ __global__ void cfar_detect_sat(
     int Nref, float alpha)
 {
     // Shared memory atomiclerini h�zland�rmak i�in
-    __shared__ unsigned int s_det, s_tp, s_fp;
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
-        s_det = 0; s_tp = 0; s_fp = 0;
-    }
-    __syncthreads();
+
 
     int r = blockIdx.y * blockDim.y + threadIdx.y;
     int c = blockIdx.x * blockDim.x + threadIdx.x;
@@ -173,8 +169,7 @@ __global__ void cfar_detect_sat(
         float cur = load_ro(&power[idx_curr]);
 
         bool out = (cur > thr) ? true : false;
-
-        if (detect) detect[idx_curr] = out;
+        detect[idx_curr] = out;
 
 
     }

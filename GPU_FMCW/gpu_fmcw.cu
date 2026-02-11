@@ -47,9 +47,6 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
     gpuErrchk(cudaMalloc(&bpCfarData, TOTAL_SIZE * sizeof(bool))); 
 
 
-    cfarData.power.resize(TOTAL_SIZE);
-    cfarData.truth = new bool[TOTAL_SIZE];
-
     bpCFAR = new bool[TOTAL_SIZE];
     cfarProcessor.init(cfarParam);
 }
@@ -209,13 +206,13 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     // Sonuç d_transposed içinde kaldı.
     //printf("Basladi 33\n");
     //gpuErrchk(cudaMemcpy(fOutput, f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
-    printf("31\n");
+    
     //cudaMemcpy(cfarData.power.data(), f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToDevice);
 
     cfarProcessor.process(cfarParam, fpCfarData, bpCfarData);
-    printf("32\n");
+    
     cudaMemcpy(bpCFAR, bpCfarData, TOTAL_SIZE * sizeof(bool), cudaMemcpyDeviceToHost);
-    printf("33\n");
+    
     // 5. CFAR İŞLEMİ (GPUCFAR_SAT)
     // ---------------------------------------------------------
 
@@ -229,7 +226,6 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     vfgpuTime.push_back(fgpuTime);
     vfgpuComputeTime.push_back(fgpuComputeTime);
     gpuErrchk(cudaMemcpy(fOutput, fpCfarData, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
-    printf("34\n");
     memcpy(f_data_host, fOutput,  TOTAL_SIZE * sizeof(float));
     //printf("Basladi 35\n");
 }
