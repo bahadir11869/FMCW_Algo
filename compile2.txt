@@ -1,4 +1,5 @@
 CPU_FMCW/cpu_fmcw.cpp
+CPU_CFAR/cfar_cpu.cpp
 GPU_FMCW/gpu_fmcw.cu
 KERNEL_FMCW/kernels.cu
 -lcufft

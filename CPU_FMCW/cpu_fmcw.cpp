@@ -1,10 +1,13 @@
 #include "cpu_fmcw.h"
 #include <omp.h>
 
-
+CFARParams p;
+CPUCFAR cpu_sat(p);
 
 cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
 {
+   
+
     this->strDosyaAdi = strDosyaAdi;
     fcpuTime = 0.0;
     vfcpuTime = {};
@@ -110,11 +113,17 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
             #pragma omp critical
             for(int j=0; j<NUM_CHIRPS; ++j) 
             {
-                sumVector[i * NUM_CHIRPS + j] += std::abs(row[j]);
+                sumVector[i * NUM_CHIRPS + j] += std::norm(row[j]);
             }
         }
     }
     printf("CPU basic bitt, \n");
+    
+    CFARData cfarData;
+    cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
+    cfarData.truth = new bool[TOTAL_SIZE];
+    
+    cpu_sat.process(cfarData);
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     vfcpuTime.push_back(fcpuTime);

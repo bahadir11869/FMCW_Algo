@@ -21,7 +21,7 @@ int main()
     gpuErrchk(cudaMallocHost((void**)&h_pinned_outputCPU, TOTAL_SIZE * sizeof(Complex)));
     gpuErrchk(cudaMallocHost((void**)&h_pinned_outputGPU, TOTAL_SIZE * sizeof(float)));
 
-    readBin("radar_raw_frameBin/000006.bin", fullData);
+    readBin("radar_raw_frameBin/adcData_padded.bin", fullData);
     /*
     int s = 5;  // Sample index
     int c = 1;   // Chirp index
@@ -88,11 +88,10 @@ int main()
 
     cpu_fmcw cpuFMCWManuel("CPU_FMCW/cpu_Recursive.txt");
     cpuFMCWManuel.run_cpu_basic(fullData);                
- 
 
     FILE* file13 = fopen("CPU_FMCW/duzFFT.txt", "w+");
     printf("CPU Basic %f \n", cpuFMCWManuel.getOutput()[1]);
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < TOTAL_SIZE; ++i) {
         fprintf(file15, "genlik:  %f\n", cpuFMCWManuel.getOutput()[i]);
     }
     fclose(file13);

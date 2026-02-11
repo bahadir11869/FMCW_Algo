@@ -1,5 +1,7 @@
 #pragma once
 #include "../defines.h"
+#include "../CPU_CFAR/cfar_cpu.hpp"
+
 #include <mkl.h>
 
 class cpu_fmcw
