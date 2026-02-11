@@ -1,8 +1,11 @@
 #include "cpu_fmcw.h"
 #include <omp.h>
 
+
 CFARParams p;
+CFARParams p2;
 CPUCFAR cpu_sat(p);
+//AVXCFAR avxcfar(p2);
 
 cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
 {
@@ -118,14 +121,14 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
             }
         }
     }
-    printf("CPU basic bitt, \n");   
+    //printf("CPU basic bitt, \n");   
     auto cfar = std::chrono::high_resolution_clock::now(); 
     cpu_sat.process(cfarData);
     auto cfar_end = std::chrono::high_resolution_clock::now(); 
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     float cfarTime =  std::chrono::duration<float, std::milli>(cfar_end - cfar).count();
-    printf("CPU total time %f  cfar time %f\n", fcpuTime, cfarTime);
+    //printf("CPU total time %f  cfar time %f\n", fcpuTime, cfarTime);
     vfcpuTime.push_back(fcpuTime);
 }
 
@@ -159,12 +162,12 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
         
        
         for (int ch = 0; ch < NUM_CHANNELS; ++ch) {
-            temp += std::abs(all_transposed[ch * TOTAL_SIZE + n]);
+            temp += std::norm(all_transposed[ch * TOTAL_SIZE + n]);
         }
         sumVector[n] = temp;
         temp = 0.0;
     }
-
+    //avxcfar.process(cfarData);
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     vfcpuTime.push_back(fcpuTime);

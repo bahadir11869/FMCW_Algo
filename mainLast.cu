@@ -52,11 +52,6 @@ int main()
         gpuErrchk(cudaDeviceSynchronize());
     }
 
-    FILE* file12 = fopen("GPU_FMCW/fftshared.txt", "w+");
-    for (int i = 0; i < 2000; ++i) {
-        fprintf(file12, "genlik:  %f\n", gpuManuelSHM.getOutput()[i]);
-    }
-    fclose(file12);
 
     memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
     gpu_fmcw gpu2DFFT(2,"GPU_FMCW/2DFFT.txt");
@@ -83,18 +78,29 @@ int main()
     cpu_fmcw cpuFMCWManuel("CPU_FMCW/cpu_Recursive.txt");
     cpuFMCWManuel.run_cpu_basic(fullData);                
 
-    FILE* file13 = fopen("CPU_FMCW/duzFFT.txt", "w+");
-    //printf("CPU Basic %f \n", cpuFMCWManuel.getOutput()[1]);
-    for (int i = 0; i < TOTAL_SIZE; ++i) {
-        fprintf(file13, "genlik:  %f\n", cpuFMCWManuel.getOutput()[i]);
-    }
-    fclose(file13);
+
     for(int i=0; i<TOTAL_SIZE; ++i) {
     detectionMap[i] = (cpuFMCWManuel.cfarData.truth[i]) ? 1.0f : 0.0f;
     }
     save_rdm_data("CPU_FMCW/radar_mask_duz_FMCW.csv", detectionMap.data(), true);
     save_rdm_data("CPU_FMCW/duz_FMCW.csv", cpuFMCWManuel.getOutput(), true);
+    /*
+    cpu_fmcw cpuFMCWAVX("CPU_FMCW/cpu_AVX.txt");
+    memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
+    cpuFMCWAVX.run_cpu_avx(h_pinned_input, h_pinned_outputCPU);
+    
+    printf("\nCPU AVX Total time: %f\n", cpuFMCWAVX.getCpuTime());
 
+
+
+    for(int i=0; i<TOTAL_SIZE; ++i) 
+    {
+        detectionMap[i] = (cpuFMCWAVX.cfarData.truth[i]) ? 1.0f : 0.0f;
+    }
+
+    save_rdm_data("CPU_FMCW/radar_mask_AVX.csv", detectionMap.data(), true);
+    save_rdm_data("CPU_FMCW/AVX.csv", cpuFMCWAVX.getOutput(), true);
+    */
     printf("GPU Manuel FFT Shared Mem: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));    
     printf("2D_FFT Compute time: %f ms total time: %f ms bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
     printf("CPU Recurisive FFT OpenMP time: %f\n", cpuFMCWManuel.getCpuTime());

@@ -1,7 +1,8 @@
 CPU_FMCW/cpu_fmcw.cpp
-CPU_CFAR/cfar_cpu.cpp
-GPU_CFAR/cfar_gpu_sat.cu
 GPU_FMCW/gpu_fmcw.cu
+CPU_CFAR/cfar_cpu.cpp
+CPU_CFAR/cfar_avx.cpp
+GPU_CFAR/cfar_gpu_sat.cu
 KERNEL_FMCW/kernels.cu
 -lcufft
 -Xcompiler "/openmp:llvm"

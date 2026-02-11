@@ -348,19 +348,17 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
 
     cfarProcessor.process(cfarParam, fpCfarData, bpCfarData);
     cudaMemcpy(bpCFAR, bpCfarData, TOTAL_SIZE * sizeof(bool), cudaMemcpyDeviceToHost);
-
-
     gpuErrchk(cudaMemcpy(ptroutput, fpCfarData, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
-
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
 
 
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
     vfgpuComputeTime.push_back(fgpuComputeTime);
 
     //gpuErrchk(cudaMemcpy(output.data(), d_transposed, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
-    cudaEventRecord(stop);
+
     // --- KRITIK BOLGE BITIS ---
-    cudaEventSynchronize(stop);
     cudaEventElapsedTime(&fgpuTime, start, stop);
     vfgpuTime.push_back(fgpuTime);
     memcpy(f_data_host, ptroutput,  TOTAL_SIZE * sizeof(float));

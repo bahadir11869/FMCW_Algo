@@ -1,6 +1,7 @@
 #include "cfar_cpu.hpp"
 #include <omp.h>
 
+
 CFARStats CPUCFAR::process(const CFARData& d) {
     CFARStats s{};
 
@@ -54,23 +55,12 @@ CFARStats CPUCFAR::process(const CFARData& d) {
                 printf("column: %d, row:   %d idx: %d\n", c, r, idx(r, c, cols));
             }
             else{
-                
+
                 d.truth[idx(r, c, cols)] = false;
                 
             }
         }
     }
-
-    // istatistikler
-    /*long long total_targets = 0;
-    for (auto v : d.truth) if (v) total_targets++;
-    long long tested = (rows - 2 * win_r) * (cols - 2 * win_c);
-    long long non = tested - total_targets;
-    s.detections = det; s.tp = tp; s.fp = fp;
-    s.total_targets = total_targets; s.tested = tested; s.non_targets = non;
-    s.Pd = total_targets ? (double)tp / total_targets : 0.0;
-    s.Pfa_emp = non ? (double)fp / non : 0.0;
-
-    s.wall_ms = s.cpu_ms_total; // CPU i�in wall=total*/
     return s;
 }
+
