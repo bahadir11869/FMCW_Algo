@@ -1,5 +1,6 @@
 #pragma once
 #include "../defines.h"
+#include "../GPU_CFAR/cfar_gpu_sat.hpp"
 
 class gpu_fmcw
 {
@@ -36,8 +37,14 @@ private:
 
     void execute_naive_fft(cuComplex* data_ptr, cuComplex* temp_ptr, int n, int batch_count, int log2_n);
 
-public:
 
+public:
+    bool* bpCFAR;
+    float* fpCfarData;
+    bool* bpCfarData;
+    CFARData cfarData;
+    CFARParams cfarParam;
+    GPUCFAR_SAT cfarProcessor;
     gpu_fmcw(int fftType, std::string strDosyaAdi);
     ~gpu_fmcw();
     void run_gpu_manuel_transpose(std::vector<Complex>& input);

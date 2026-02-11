@@ -8,13 +8,13 @@ NUM_SAMPLES = 128
 
 C = 3e8
 FC = 77e9
-BANDWIDTH = 150e6
-CHIRP_DURATION = 50e-6
+BANDWIDTH = 670e6
+CHIRP_DURATION = 117e-6
 FRAME_DURATION = NUM_CHIRPS * CHIRP_DURATION
 
 # Çözünürlük Hesapları
 RANGE_RES = C / (2 * BANDWIDTH)
-VELOCITY_RES = (C / FC) / (2 * FRAME_DURATION)
+VELOCITY_RES = 0.065#(C / FC) / (2 * FRAME_DURATION)
 
 def create_figure_for_file(filename, custom_title="RDM Plot"):
     """
@@ -53,7 +53,7 @@ def create_figure_for_file(filename, custom_title="RDM Plot"):
     extent_vals = [0, max_range, -max_vel, max_vel]
 
     # 4. Çizim
-    plt.imshow(data_db.T, aspect='auto', cmap='jet', origin='lower', extent=extent_vals)
+    plt.imshow(data_db.T, aspect='auto', cmap='inferno', origin='lower', extent=extent_vals)
     
     plt.title(f"{custom_title}\n(Res: {RANGE_RES:.2f} m, {VELOCITY_RES:.2f} m/s)")
     plt.xlabel("Range (m)")
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # Format: ("Dosya Yolu", "Grafik Başlığı")
     files_to_plot = [
         ("../GPU_FMCW/2DFFT_GPU.csv", "1. Method: 2D FFT GPU cuFFT"),
-        ("../CPU_FMCW/AVXFFT_CPU.csv",     "2. Method: CPU AVX Lib"),
+        ("../GPU_FMCW/radar_mask.csv",     "2. Method: CPU AVX Lib"),
     ]
 
     print("Grafikler hazırlanıyor...")

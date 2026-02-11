@@ -58,7 +58,12 @@ int main()
     }
     fclose(file12);
 
+    save_rdm_data("GPU_FMCW/radar_mask_ManuelSHM.csv", (float*)gpuManuelSHM.bpCFAR, true);
+    printf("Burada 3\n");
+    save_rdm_data("GPU_FMCW/ManuelSHM.csv", gpuManuelSHM.getOutput(), true);
+    printf("Burada 4\n");
 
+    /*
     memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
     gpu_fmcw gpu2DFFT(2,"GPU_FMCW/2DFFT.txt");
 
@@ -84,6 +89,7 @@ int main()
         fprintf(file15, "genlik:  %f\n", cpuFMCWAVX.getOutput()[i]);
     }
     fclose(file15);
+    */
 
     /* duz fmcw ve cfar eklendi.
     cpu_fmcw cpuFMCWManuel("CPU_FMCW/cpu_Recursive.txt");

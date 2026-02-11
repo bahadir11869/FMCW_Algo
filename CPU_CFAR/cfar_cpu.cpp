@@ -54,7 +54,7 @@ CFARStats CPUCFAR::process(const CFARData& d) {
                 printf("column: %d, row:   %d idx: %d\n", c, r, idx(r, c, cols));
             }
             else{
-
+                
                 d.truth[idx(r, c, cols)] = false;
                 
             }

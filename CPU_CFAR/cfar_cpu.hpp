@@ -1,5 +1,5 @@
 #pragma once
-#include "cfar_common.hpp"
+#include "../defines.h"
 
 class CPUCFAR {
 public:

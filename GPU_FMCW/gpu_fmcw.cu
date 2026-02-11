@@ -41,7 +41,17 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
                 NULL, 1, TOTAL_SIZE, // Output layout
                 CUFFT_C2C, NUM_CHANNELS); // 8 Adet (Batch)
 
-    }    
+    } 
+
+    gpuErrchk(cudaMalloc(&fpCfarData, TOTAL_SIZE * sizeof(float))); 
+    gpuErrchk(cudaMalloc(&bpCfarData, TOTAL_SIZE * sizeof(bool))); 
+
+
+    cfarData.power.resize(TOTAL_SIZE);
+    cfarData.truth = new bool[TOTAL_SIZE];
+
+    bpCFAR = new bool[TOTAL_SIZE];
+    cfarProcessor.init(cfarParam);
 }
 
 
@@ -187,7 +197,7 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     //printf("Basladi 31\n");
     sumChannelsKernel<<<blocksSum, threadsSum>>>(
         d_transposed_all, 
-        f_data, 
+        fpCfarData, 
         NUM_CHANNELS, 
         TOTAL_SIZE
     );
@@ -198,7 +208,19 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     // 5. Device -> Host
     // Sonuç d_transposed içinde kaldı.
     //printf("Basladi 33\n");
-    gpuErrchk(cudaMemcpy(fOutput, f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+    //gpuErrchk(cudaMemcpy(fOutput, f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+    printf("31\n");
+    //cudaMemcpy(cfarData.power.data(), f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToDevice);
+
+    cfarProcessor.process(cfarParam, fpCfarData, bpCfarData);
+    printf("32\n");
+    cudaMemcpy(bpCFAR, bpCfarData, TOTAL_SIZE * sizeof(bool), cudaMemcpyDeviceToHost);
+    printf("33\n");
+    // 5. CFAR İŞLEMİ (GPUCFAR_SAT)
+    // ---------------------------------------------------------
+
+
+
     //printf("Basladi 34\n");
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -206,6 +228,8 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
     vfgpuTime.push_back(fgpuTime);
     vfgpuComputeTime.push_back(fgpuComputeTime);
+    gpuErrchk(cudaMemcpy(fOutput, fpCfarData, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+    printf("34\n");
     memcpy(f_data_host, fOutput,  TOTAL_SIZE * sizeof(float));
     //printf("Basladi 35\n");
 }

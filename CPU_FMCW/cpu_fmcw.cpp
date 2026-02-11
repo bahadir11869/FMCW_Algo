@@ -6,8 +6,6 @@ CPUCFAR cpu_sat(p);
 
 cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
 {
-   
-
     this->strDosyaAdi = strDosyaAdi;
     fcpuTime = 0.0;
     vfcpuTime = {};
@@ -33,6 +31,9 @@ cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
     sumVector = new float[TOTAL_SIZE];
     printf("Sumvector 0 : %f", sumVector[0]);
     memset(sumVector, 0.0, TOTAL_SIZE);
+
+    cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
+    cfarData.truth = new bool[TOTAL_SIZE];
 }
 
 cpu_fmcw::~cpu_fmcw()
@@ -117,12 +118,7 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
             }
         }
     }
-    printf("CPU basic bitt, \n");
-    
-
-    cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
-    cfarData.truth = new bool[TOTAL_SIZE];
-    
+    printf("CPU basic bitt, \n");    
     cpu_sat.process(cfarData);
     auto end = std::chrono::high_resolution_clock::now();
     fcpuTime = std::chrono::duration<float, std::milli>(end - start).count();
