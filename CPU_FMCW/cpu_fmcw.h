@@ -19,6 +19,7 @@ private:
 
 
 public:
+    CFARData cfarData;
     cpu_fmcw(std::string strDosyaAdi);
     ~cpu_fmcw();
     void run_cpu_basic(const std::vector<Complex>& input);

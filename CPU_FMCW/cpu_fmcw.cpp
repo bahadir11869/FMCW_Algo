@@ -119,7 +119,7 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
     }
     printf("CPU basic bitt, \n");
     
-    CFARData cfarData;
+
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     cfarData.truth = new bool[TOTAL_SIZE];
     

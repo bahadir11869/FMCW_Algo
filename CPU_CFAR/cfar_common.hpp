@@ -10,11 +10,11 @@ inline size_t idx(size_t r, size_t c, size_t C) { return r * C + c; }
 
 class CFARParams {
 public:
-    int rows = NUM_CHIRPS, cols = NUM_SAMPLES ;
+    int rows = NUM_SAMPLES, cols = NUM_CHIRPS ;
     float snr_db = 10.0f;             // güç SNR (dB)
     int ref_r = 8, ref_c = 8;
     int guard_r = 2, guard_c = 2;
-    float pfa = 1e-1f;
+    float pfa = 1e-6f;
 };
 
 class CFARData {
