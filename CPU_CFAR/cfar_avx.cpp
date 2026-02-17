@@ -20,7 +20,7 @@ void AVXCFAR::update_params(CFARParams params)
         N_ref = big_area - guard_area;
 
         // Alpha hesabı (CA-CFAR)
-        alpha = N_ref * (std::pow(P.pfa, -1.0f / N_ref) - 1.0f);
+        alpha = float(std::pow(P.pfa, -1.0f / N_ref) - 1.0f);
         
         // Çarpma işlemini hızlandırmak için bölme işlemini peşinen yapıyoruz
 }

@@ -24,24 +24,7 @@ int main()
     std::vector<float> detectionMap(TOTAL_SIZE);
 
     readBin("radar_raw_frameBin/000006.bin", fullData);
-    /*
-    int s = 5;  // Sample index
-    int c = 1;   // Chirp index
-    int r = 3;   // RX index
-    int t = 0;   // TX index
-
-    // Düzleştirilmiş index hesaplama (Row-Major Mapping)
-    // Index = s * (CHIRP*RX*TX) + c * (RX*TX) + r * (TX) + t
-    size_t index = s * (NUM_CHIRPS * NUM_RX * NUM_TX) 
-                 + c * (NUM_RX * NUM_TX) 
-                 + r * (NUM_TX) 
-                 + t;
-
-    Complex val = fullData[index];
-    std::cout << "Ornek Deger [" << s << "][" << c << "][" << r << "][" << t << "]: " 
-              << val.real() << " + " << val.imag() << "j" << std::endl;
-
-    */          
+    
 
     int iTekrarSayisi = 10;
 
@@ -65,14 +48,14 @@ int main()
     detectionMap[i] = (gpu2DFFT.bpCFAR[i]) ? 1.0f : 0.0f;
     }
     
-    save_rdm_data("GPU_FMCW/radar_mask_2DFFT.csv", detectionMap.data(), true);
-    save_rdm_data("GPU_FMCW/2DFFT.csv", gpu2DFFT.getOutput(), true);
+    save_rdm_data("GPU_FMCW/CFAR_2DFFT.csv", detectionMap.data(), true);
+    save_rdm_data("GPU_FMCW/FFT_2DFFT.csv", gpu2DFFT.getOutput(), true);
 
     for(int i=0; i<TOTAL_SIZE; ++i) {
     detectionMap[i] = (gpuManuelSHM.bpCFAR[i]) ? 1.0f : 0.0f;
     }
-    save_rdm_data("GPU_FMCW/radar_mask_ManuelSHM.csv", detectionMap.data(), true);
-    save_rdm_data("GPU_FMCW/ManuelSHM.csv", gpuManuelSHM.getOutput(), true);
+    save_rdm_data("GPU_FMCW/CFAR_ManuelSHM.csv", detectionMap.data(), true);
+    save_rdm_data("GPU_FMCW/FFT_ManuelSHM.csv", gpuManuelSHM.getOutput(), true);
 
 
     cpu_fmcw cpuFMCWManuel("CPU_FMCW/cpu_Recursive.txt");
@@ -82,10 +65,10 @@ int main()
     for(int i=0; i<TOTAL_SIZE; ++i) {
     detectionMap[i] = (cpuFMCWManuel.cfarData.truth[i]) ? 1.0f : 0.0f;
     }
-    save_rdm_data("CPU_FMCW/radar_mask_duz_FMCW.csv", detectionMap.data(), true);
-    save_rdm_data("CPU_FMCW/duz_FMCW.csv", cpuFMCWManuel.getOutput(), true);
+    save_rdm_data("CPU_FMCW/CFAR_CPU.csv", detectionMap.data(), true);
+    save_rdm_data("CPU_FMCW/FFT_CPU.csv", cpuFMCWManuel.getOutput(), true);
 
-    /*
+    
     cpu_fmcw cpuFMCWAVX("CPU_FMCW/cpu_AVX.txt");
     memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
     cpuFMCWAVX.run_cpu_avx(h_pinned_input, h_pinned_outputCPU);
@@ -98,9 +81,9 @@ int main()
         detectionMap[i] = (cpuFMCWAVX.cfarData.truth[i]) ? 1.0f : 0.0f;
     }
 
-    save_rdm_data("CPU_FMCW/radar_mask_AVX.csv", detectionMap.data(), true);
-    save_rdm_data("CPU_FMCW/AVX.csv", cpuFMCWAVX.getOutput(), true);
-    */
+    save_rdm_data("CPU_FMCW/CFAR_AVX.csv", detectionMap.data(), true);
+    save_rdm_data("CPU_FMCW/FFT_AVX.csv", cpuFMCWAVX.getOutput(), true);
+
     printf("GPU Manuel FFT Shared Mem: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));    
     printf("2D_FFT Compute time: %f ms total time: %f ms bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
     printf("CPU Recurisive FFT OpenMP time: %f\n", cpuFMCWManuel.getCpuTime());

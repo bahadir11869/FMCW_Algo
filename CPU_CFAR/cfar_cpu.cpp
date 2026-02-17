@@ -13,7 +13,7 @@ CFARStats CPUCFAR::process(const CFARData& d) {
     const int N = big_h * big_w - guard_h * guard_w;
     
     const float alpha = N * (std::pow(P.pfa, -1.0f / N) - 1.0f);
-
+    std::fill(d.truth, d.truth + rows * cols, false);
     // SAT
     std::vector<float> sat((size_t)rows * cols);
 #pragma omp parallel for schedule(static)
@@ -53,11 +53,6 @@ CFARStats CPUCFAR::process(const CFARData& d) {
             if(cur > thr) {
                 d.truth[idx(r, c, cols)] = true;
                 //printf("column: %d, row:   %d idx: %d\n", c, r, idx(r, c, cols));
-            }
-            else{
-
-                d.truth[idx(r, c, cols)] = false;
-                
             }
         }
     }
