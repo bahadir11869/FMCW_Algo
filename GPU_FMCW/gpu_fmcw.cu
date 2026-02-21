@@ -7,10 +7,13 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
     this->strDosyaAdi = strDosyaAdi;
     vfgpuTime = {};
     vfgpuComputeTime = {};
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventCreate(&start2);
-    cudaEventCreate(&stop2);
+    cudaEventCreate(&start_total);
+    cudaEventCreate(&stop_total);
+    cudaEventCreate(&start_fmcw_compute);
+    cudaEventCreate(&stop_fmcw_compute);
+    cudaEventCreate(&start_cfar_compute);
+    cudaEventCreate(&stop_cfar_compute);
+
     this->fftType = fftType;
     gpuErrchk(cudaMalloc(&f_data, TOTAL_SIZE * sizeof(float))); 
     f_data_host = new float[TOTAL_SIZE];
@@ -58,10 +61,12 @@ gpu_fmcw::~gpu_fmcw()
     cudaFree(d_data_all);
     cudaFree(f_data);
     delete [] f_data_host;
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
-    cudaEventDestroy(start2);
-    cudaEventDestroy(stop2);
+    cudaEventDestroy(start_total);
+    cudaEventDestroy(stop_total);
+    cudaEventDestroy(start_fmcw_compute);
+    cudaEventDestroy(stop_fmcw_compute);
+    cudaEventDestroy(start_cfar_compute);
+    cudaEventDestroy(stop_cfar_compute);
 
     for (int i = 0; i < 4; ++i) 
     {
@@ -99,60 +104,16 @@ void gpu_fmcw::execute_naive_fft(cuComplex* data_ptr, cuComplex* temp_ptr, int n
         k_butterfly_stage<<<blocks_bf, threads>>>(data_ptr, n, stage_width, batch_count);
     }
 }
-void gpu_fmcw::run_gpu_manuel_FFT_Shared_Yok(std::vector<Complex>& input)
-{
-    size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
-    if(input.size() != TOTAL_SIZE) 
-        output.resize(TOTAL_SIZE);
-    
-    cudaEventRecord(start);
-
-    // 1. Host -> Device
-    gpuErrchk(cudaMemcpy(d_data, input.data(), sizeBytes, cudaMemcpyHostToDevice));
-
-    // 2. Range FFT
-    // Veri: d_data | Temp: d_transposed (Henüz boş, kullanabiliriz)
-    cudaEventRecord(start2);
-    execute_naive_fft(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS, log2_samples);
-
-    // 3. Transpose (d_data -> d_transposed)
-    dim3 threads(TILE_DIM, TILE_DIM);
-    dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
-    transpose_optimized_kernel<<<blocks, threads>>>(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS);
-
-    // 4. Doppler FFT
-    // Veri: d_transposed | Temp: d_data (Range verisiyle işimiz bitti, çöplük yapabiliriz)
-    execute_naive_fft(d_transposed, d_data, NUM_CHIRPS, NUM_SAMPLES, log2_chirps);
-    cudaEventRecord(stop2);
-    cudaEventSynchronize(stop2);
-    // 5. Device -> Host (Sonuç d_transposed içinde)
-    gpuErrchk(cudaMemcpy(output.data(), d_transposed, sizeBytes, cudaMemcpyDeviceToHost));
-
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-
-
-    cudaEventElapsedTime(&fgpuTime, start, stop);
-    cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
-    vfgpuTime.push_back(fgpuTime);
-    vfgpuComputeTime.push_back(fgpuComputeTime);
-}
 
 void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float* fOutput)
 {
     size_t sizeBytes = TOTAL_ELEMENTS * sizeof(cuComplex);
-    cudaEventRecord(start);
+    cudaEventRecord(start_total);
 
     // 1. Host -> Device
     gpuErrchk(cudaMemcpy(d_data_all, input.data(), sizeBytes, cudaMemcpyHostToDevice));
-    
+    cudaEventRecord(start_fmcw_compute);
 
-
-    // --- RANGE FFT (Shared Memory Optimized) ---
-    // Her blok 1 Chirp işleyecek. (NUM_CHIRPS tane blok)
-    // Her blokta N/2 tane thread olacak. (1024 / 2 = 512 thread)
-    // Shared Memory Boyutu: N * sizeof(cuComplex) -> 1024 * 8 = 8KB (Yeterli)
-    
     int threadsPerBlock = NUM_SAMPLES / 2;
     int numBlocks = NUM_CHIRPS * NUM_CHANNELS;
     int sharedMemSize = NUM_SAMPLES * sizeof(cuComplex);
@@ -198,120 +159,30 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
         NUM_CHANNELS, 
         TOTAL_SIZE
     );
-    //printf("Basladi 32\n");
+  
+    cudaEventRecord(stop_fmcw_compute);
+    cudaEventSynchronize(stop_fmcw_compute);
 
-
-    // 5. Device -> Host
-    // Sonuç d_transposed içinde kaldı.
-    //printf("Basladi 33\n");
-    //gpuErrchk(cudaMemcpy(fOutput, f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
-    
-    //cudaMemcpy(cfarData.power.data(), f_data, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToDevice);
-    cudaEventRecord(start2);
+    cudaEventRecord(start_cfar_compute);    
     cfarProcessor.process(cfarParam, fpCfarData, bpCfarData);
-    cudaEventRecord(stop2);
-    cudaEventSynchronize(stop2);
+    cudaEventRecord(stop_cfar_compute);
+    cudaEventSynchronize(stop_cfar_compute);
+
     cudaMemcpy(bpCFAR, bpCfarData, TOTAL_SIZE * sizeof(bool), cudaMemcpyDeviceToHost);
 
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&fgpuTime, start, stop);
-    cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
+    cudaEventRecord(stop_total);
+    cudaEventSynchronize(stop_total);
+
+    cudaEventElapsedTime(&fgpuTime, start_total, stop_total);
+    cudaEventElapsedTime(&fgpuComputeTime, start_fmcw_compute, stop_fmcw_compute);
+    cudaEventElapsedTime(&cfarComputeTime, start_cfar_compute, stop_cfar_compute);
+
     vfgpuTime.push_back(fgpuTime);
     vfgpuComputeTime.push_back(fgpuComputeTime);
+    vfCfargpuTime.push_back(cfarComputeTime);
+    
     gpuErrchk(cudaMemcpy(fOutput, fpCfarData, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
     memcpy(f_data_host, fOutput,  TOTAL_SIZE * sizeof(float));
-    //printf("Basladi 35\n");
-}
-
-void gpu_fmcw::run_gpu_streams(Complex* h_input, Complex* h_output)
-{
-    // Veriyi 4 parçaya bölüyoruz
-    int nStreams = 4;
-    int chirpsPerStream = NUM_CHIRPS / nStreams; // 2048 / 4 = 512 Chirp
-    int samplesPerStream = chirpsPerStream * NUM_SAMPLES; // Veri boyutu
-    size_t streamBytes = samplesPerStream * sizeof(cuComplex);
-
-    cudaEventRecord(start); // Süreyi başlat
-
-    // --- AŞAMA 1: Range FFT + Veri Yükleme (PIPELINE) ---
-    // Döngü dönerken: Bir stream yükleme yaparken diğeri hesaplama yapacak.
-    
-    cudaEventRecord(start2); // Compute süresi (Transfer dahil pipeline)
-
-    for (int i = 0; i < nStreams; ++i) 
-    {
-        int offset = i * samplesPerStream; // Verinin başlangıç noktası
-
-        // 1. ASENKRON Kopyalama (Host -> Device)
-        // CPU beklemez, hemen bir sonraki satıra geçer.
-        cudaMemcpyAsync(&d_data[offset], &h_input[offset], streamBytes, cudaMemcpyHostToDevice, streams[i]);
-
-        // 2. Range FFT (Sadece o parçayı işle)
-        // Kernelin o parçada çalışması için pointer'ı kaydırıyoruz (d_data + offset)
-        int threadsPerBlock = NUM_SAMPLES / 2;
-        int numBlocks = chirpsPerStream; // Sadece 512 blok
-        int sharedMemSize = NUM_SAMPLES * sizeof(cuComplex);
-
-        k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize, streams[i]>>>(d_data + offset, NUM_SAMPLES, log2_samples);
-    }
-
-    // DİKKAT: Transpose işlemi tüm verinin bitmesini beklemek ZORUNDADIR.
-    // Çünkü satır verisi sütuna dönüşecek, veriler karışacak.
-    cudaDeviceSynchronize(); 
-
-    // --- AŞAMA 2: Transpose (Mevcut Kernel - Aynen kalıyor) ---
-    dim3 threads(TILE_DIM, TILE_DIM);
-    dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
-    transpose_optimized_kernel<<<blocks, threads>>>(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS);
-    
-    // --- AŞAMA 3: Doppler FFT ---
-    // Transpose sonrası veri d_transposed içinde. Bunu çalıştırıyoruz.
-    int threadsPerBlock = NUM_CHIRPS / 2; 
-    int numBlocks = NUM_SAMPLES;
-    int sharedMemSize = NUM_CHIRPS * sizeof(cuComplex);
-    
-    // Doppler FFT (Sonuç d_transposed üzerinde kalıyor)
-    k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_transposed, NUM_CHIRPS, log2_chirps);
-    
-    cudaEventRecord(stop2); // Compute Bitiş
-
-    // --- AŞAMA 4: Sonuç Kopyalama (Device -> Host) ---
-    // Bunu da istersen stream ile bölebilirsin ama tek seferde alalım şimdilik.
-    cudaMemcpy(h_output, d_transposed, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost);
-
-    cudaEventRecord(stop); // Toplam Bitiş
-    cudaEventSynchronize(stop);
-
-    cudaEventElapsedTime(&fgpuTime, start, stop);
-    cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
-    vfgpuTime.push_back(fgpuTime);
-    vfgpuComputeTime.push_back(fgpuComputeTime);
-    memcpy(output.data(), h_output, TOTAL_SIZE * sizeof(cuComplex));
-}
-
-void gpu_fmcw::run_gpu_manuel_transpose(std::vector<Complex>& input)
-{
-    size_t sizeBytes = TOTAL_SIZE * sizeof(cuComplex);
-    output.resize(TOTAL_SIZE);
-    
-    cudaEventRecord(start);
-    gpuErrchk(cudaMemcpy(d_data, input.data(), sizeBytes, cudaMemcpyHostToDevice));
-    cudaEventRecord(start2);
-    cufftExecC2C(planRange, d_data, d_data, CUFFT_FORWARD);
-    dim3 threads(TILE_DIM, TILE_DIM);
-    dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, (NUM_CHIRPS + TILE_DIM - 1) / TILE_DIM);
-    transpose_optimized_kernel<<<blocks, threads>>>(d_data, d_transposed, NUM_SAMPLES, NUM_CHIRPS);
-    cufftExecC2C(planDoppler, d_transposed, d_transposed, CUFFT_FORWARD);
-    cudaEventRecord(stop2);
-    cudaEventSynchronize(stop2);
-    gpuErrchk(cudaMemcpy(output.data(), d_transposed, sizeBytes, cudaMemcpyDeviceToHost));
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&fgpuTime, start, stop);
-    cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
-    vfgpuTime.push_back(fgpuTime);
-    vfgpuComputeTime.push_back(fgpuComputeTime);
 }
 
 void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
@@ -319,16 +190,17 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
     size_t sizeBytes = TOTAL_ELEMENTS * sizeof(cuComplex);
 
     // --- KRITIK BOLGE BASLANGIC ---
-    cudaEventRecord(start);
+    cudaEventRecord(start_total);
 
     // 1. Veri Transferi (Host -> Device)
     // Pinned memory olduğu için çok daha hızlıdır.
     gpuErrchk(cudaMemcpy(d_data_all, input, sizeBytes, cudaMemcpyHostToDevice));
-    cudaEventRecord(start2);
+    
+    cudaEventRecord(start_fmcw_compute);
     // 2. 2D FFT (Hem Range hem Doppler işlemini ve Transpose mantığını içerir)
     cufftExecC2C(plan, d_data_all, d_data_all, CUFFT_FORWARD);
-    cudaEventRecord(stop2);
-    cudaEventSynchronize(stop2);
+
+
     // 3. Veri Transferi (Device -> Host)
     int threadsPerBlock = 256;
     int blocksPerGrid = (TOTAL_SIZE + threadsPerBlock - 1) / threadsPerBlock;
@@ -345,22 +217,33 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
     sumChannelsKernel<<<blocksPerGrid, threadsPerBlock>>>(
         d_transposed_all, fpCfarData, NUM_CHANNELS, TOTAL_SIZE
     );
+    cudaEventRecord(stop_fmcw_compute);
+    cudaEventSynchronize(stop_fmcw_compute);
 
+    cudaEventRecord(start_cfar_compute);
     cfarProcessor.process(cfarParam, fpCfarData, bpCfarData);
+    cudaEventRecord(stop_cfar_compute);
+
     cudaMemcpy(bpCFAR, bpCfarData, TOTAL_SIZE * sizeof(bool), cudaMemcpyDeviceToHost);
+    cudaEventRecord(stop_total);
+    cudaEventSynchronize(stop_total);
+
     gpuErrchk(cudaMemcpy(ptroutput, fpCfarData, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    
 
 
-    cudaEventElapsedTime(&fgpuComputeTime, start2, stop2);
+    cudaEventElapsedTime(&fgpuComputeTime, start_fmcw_compute, stop_fmcw_compute);
     vfgpuComputeTime.push_back(fgpuComputeTime);
 
     //gpuErrchk(cudaMemcpy(output.data(), d_transposed, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
 
     // --- KRITIK BOLGE BITIS ---
-    cudaEventElapsedTime(&fgpuTime, start, stop);
+    cudaEventElapsedTime(&fgpuTime, start_total, stop_total);
     vfgpuTime.push_back(fgpuTime);
+
+    cudaEventElapsedTime(&cfarComputeTime, start_cfar_compute, stop_cfar_compute);
+    vfCfargpuTime.push_back(cfarComputeTime);
+
     memcpy(f_data_host, ptroutput,  TOTAL_SIZE * sizeof(float));
     //memcpy(output.data(), ptroutput, TOTAL_SIZE * sizeof(Complex));
 }
@@ -383,6 +266,15 @@ float gpu_fmcw::getGpuComputeTime()
         fSum += i;
     }
     return fSum / vfgpuComputeTime.size();
+}
+float gpu_fmcw::getCfarGpuComputeTime()
+{
+    float fSum = 0.0f;
+    for(auto i: vfCfargpuTime)
+    {
+        fSum += i;
+    }
+    return fSum / vfCfargpuTime.size();
 }
 
 std::string gpu_fmcw::getDosyaAdi()

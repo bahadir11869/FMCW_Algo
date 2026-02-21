@@ -13,7 +13,6 @@ std::vector<stTarget> s1 = {
 
 int main()
 {
-
     std::vector<Complex> fullData(TOTAL_ELEMENTS);
     Complex *h_pinned_input, *h_pinned_outputCPU;
     float* h_pinned_outputGPU;
@@ -23,8 +22,8 @@ int main()
     long long transferred_bytes = TOTAL_SIZE * sizeof(float) + TOTAL_ELEMENTS * sizeof(float);
     std::vector<float> detectionMap(TOTAL_SIZE);
 
-    readBin("radar_raw_frameBin/000096.bin", fullData);
-    
+    //readBin("radar_raw_frameBin/000096.bin", fullData);
+    veriUret(fullData, s1);
 
     int iTekrarSayisi = 10;
 
@@ -73,7 +72,6 @@ int main()
     memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
     cpuFMCWAVX.run_cpu_avx(h_pinned_input, h_pinned_outputCPU);
     
-    printf("\nCPU AVX Total time: %f\n", cpuFMCWAVX.getCpuTime());
 
 
     for(int i=0; i<TOTAL_SIZE; ++i) 
@@ -83,94 +81,14 @@ int main()
 
     save_rdm_data("CPU_FMCW/CFAR_AVX.csv", detectionMap.data(), true);
     save_rdm_data("CPU_FMCW/FFT_AVX.csv", cpuFMCWAVX.getOutput(), true);
-
-    printf("GPU Manuel FFT Shared Mem: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));    
-    printf("2D_FFT Compute time: %f ms total time: %f ms bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
-    printf("CPU Recurisive FFT OpenMP time: %f\n", cpuFMCWManuel.getCpuTime());
-
-    /*
-    memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
-    gpu_fmcw gpu2DFFT(2,"GPU_FMCW/2DFFT.txt");
-
-    for(int i = 0; i < iTekrarSayisi; i++)
-    {
-        gpu2DFFT.run_gpu_2DFFT(h_pinned_input, h_pinned_outputGPU);
-        gpuErrchk(cudaDeviceSynchronize());
-    }
-
-
-    FILE* file14 = fopen("GPU_FMCW/fft2D.txt", "w+");
-    for (int i = 0; i < 2000; ++i) {
-        fprintf(file14, "genlik:  %f\n", gpu2DFFT.getOutput()[i]);
-    }
-    fclose(file14);
-
-    cpu_fmcw cpuFMCWAVX("CPU_FMCW/cpu_AVX.txt");
-    memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
-    cpuFMCWAVX.run_cpu_avx(h_pinned_input, h_pinned_outputCPU);
-        
-    FILE* file15 = fopen("CPU_FMCW/avxFFT.txt", "w+");
-    for (int i = 0; i < 2000; ++i) {
-        fprintf(file15, "genlik:  %f\n", cpuFMCWAVX.getOutput()[i]);
-    }
-    fclose(file15);
-    */
-
-    /* duz fmcw ve cfar eklendi.
-    cpu_fmcw cpuFMCWManuel("CPU_FMCW/cpu_Recursive.txt");
-    cpuFMCWManuel.run_cpu_basic(fullData);                
-
-    FILE* file13 = fopen("CPU_FMCW/duzFFT.txt", "w+");
-    printf("CPU Basic %f \n", cpuFMCWManuel.getOutput()[1]);
-    for (int i = 0; i < TOTAL_SIZE; ++i) {
-        fprintf(file13, "genlik:  %f\n", cpuFMCWManuel.getOutput()[i]);
-    }
-    fclose(file13);
-    std::vector<float> detectionMap(TOTAL_SIZE);
-    for(int i=0; i<TOTAL_SIZE; ++i) {
-    detectionMap[i] = (cpuFMCWManuel.cfarData.truth[i]) ? 1.0f : 0.0f;
-    }
-    save_rdm_data("CPU_FMCW/radar_mask_duz_FMCW.csv", detectionMap.data(), true);
-    save_rdm_data("CPU_FMCW/duz_FMCW.csv", cpuFMCWManuel.getOutput(), true);
-    */
-
-
-
-
-    //printf("GPU Manuel FFT Shared Mem: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));    
-    //printf("2D_FFT Compute time: %f ms total time: %f ms bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
-    
-    //printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR CPU --------- \n\n");
-    //printf("CPU Recurisive FFT OpenMP time: %f CPU AVX Total time: %f\n", 
-    //cpuFMCWManuel.getCpuTime(), cpuFMCWAVX.getCpuTime());
-    
-    //save_rdm_data("GPU_FMCW/2DFFT_GPU.csv", gpu2DFFT.getOutput(), true);
-    //save_rdm_data("CPU_FMCW/AVXFFT_CPU.csv", cpuFMCWAVX.getOutput(), true);  
-    
-    /*
-    save_rdm_data("GPU_FMCW/2DFFT_GPU.csv", gpu2DFFT.getOutput(), true);
-    save_rdm_data("CPU_FMCW/AVXFFT_CPU.csv", cpuFMCWAVX.getOutput(), true);  
-      
-    printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR GPU --------- \n\n");
-    printf("GPU Manuel FFT Shared Mem: Compute time: %f ms  total time: %f ms bandWithGPUManuelSharedMem : %f GB/s RTX 3060 Max BandWith: ~360 GB/s \n", gpuManuelSHM.getGpuComputeTime(),  gpuManuelSHM.getGpuTime(), (transferred_bytes * 1e-9)/(gpuManuelSHM.getGpuComputeTime()/1000.0));    
-    printf("2D_FFT Compute time: %f ms total time: %f ms bandWithGPU2D : %f GB/s RTX 3060 Max BandWith: ~360 GB/s\n", gpu2DFFT.getGpuComputeTime(),gpu2DFFT.getGpuTime(), (transferred_bytes * 1e-9)/(gpu2DFFT.getGpuComputeTime()/1000.0));
-    
-    printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR CPU --------- \n\n");
-    printf("CPU Recurisive FFT OpenMP time: %f CPU AVX Total time: %f\n", 
-    cpuFMCWManuel.getCpuTime(), cpuFMCWAVX.getCpuTime());
-    
-    printf("\n\n\t\t\t\t\t\t\t\t\t --------SONUCLAR CPU AVX vs GPU  --------- \n\n");
-
-    
     
 
-    printf("GPUManuelFFTSharedMem vs AVX RMSE \n");
-    calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpuManuelSHM.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
+    printf("CPU Recurisive FFT OpenMP  FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms\n", cpuFMCWManuel.getCpuTime(), cpuFMCWManuel.getCfarCpuTime(), cpuFMCWManuel.getCpuTime() + cpuFMCWManuel.getCfarCpuTime());
+    printf("CPU AVX FFT OpenMP         FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms\n", cpuFMCWAVX.getCpuTime(), cpuFMCWAVX.getCfarCpuTime(), cpuFMCWAVX.getCpuTime() + cpuFMCWAVX.getCfarCpuTime());
 
-    printf("Gpu2D vs AVX RMSE \n");
-    calculate_RMSE_Vectors(cpuFMCWAVX.getOutput(), gpu2DFFT.getOutput(), NUM_SAMPLES, NUM_CHIRPS, false);  
+    printf("GPU Manuel FFT Shared Mem: FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms \n", gpuManuelSHM.getGpuComputeTime(), gpuManuelSHM.getCfarGpuComputeTime(), gpuManuelSHM.getGpuTime());    
+    printf("2D_FFT                     FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms \n", gpu2DFFT.getGpuComputeTime(), gpu2DFFT.getCfarGpuComputeTime(), gpu2DFFT.getGpuTime());    
 
-    */   
     cudaFreeHost(h_pinned_input);
     cudaFreeHost(h_pinned_outputCPU);
     cudaFreeHost(h_pinned_outputGPU);

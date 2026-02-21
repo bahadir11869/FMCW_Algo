@@ -13,10 +13,13 @@
 #include <filesystem>
 #include <math.h>
 #include <fstream>
-
+#include <random>
 namespace fs = std::filesystem;
-const int NUM_TX = 2;
-const int NUM_RX = 4;
+// sigma: I ve Q için std sapma (noise std)
+
+
+const int NUM_TX = 1;
+const int NUM_RX = 1;
 const int NUM_CHIRPS = 256;      // Slow Time (Y)
 const int NUM_SAMPLES = 128;     // Fast Time (X)
 const int NUM_CHANNELS = NUM_TX * NUM_RX; 
@@ -40,6 +43,11 @@ const float gating_threshold = 3.0f;
 
 using Complex = std::complex<float>;
 
+inline void addComplexAwgn(Complex& x, float sigma, std::mt19937& rng)
+{
+    std::normal_distribution<float> nd(0.0f, sigma);
+    x += Complex(nd(rng), nd(rng));
+}
 
 inline size_t idx(size_t r, size_t c, size_t C) { return r * C + c; }
 
@@ -149,7 +157,6 @@ inline void calculate_RMSE_Vectors(const std::vector<T>& cpu_vec,
 
 inline void readBin(std::string binDosyasi, std::vector<Complex>& inputData)
 {
-
     std::ifstream rf(binDosyasi, std::ios::out | std::ios::binary);
     if(!rf) 
         return;
@@ -157,31 +164,42 @@ inline void readBin(std::string binDosyasi, std::vector<Complex>& inputData)
     rf.close();    
 }
 
-inline void veriUret( std::vector<Complex>& inputData, std::vector<stTarget>targets)
+inline void veriUret(std::vector<Complex>& inputData,
+                     const std::vector<stTarget>& targets,
+                     float noise_sigma=0.5f /* örn 0.05f */,
+                     uint32_t seed = 1234)
 {
-    if (inputData.size() == TOTAL_SIZE)
-    {
-        for (int i = 0; i < NUM_CHIRPS; ++i)
-        {
-            for (int j = 0; j < NUM_SAMPLES; ++j) 
-            {
-                float t = (float)j / NUM_SAMPLES * CHIRP_DURATION;
-                float totalTime = i * CHIRP_DURATION + t;
-                Complex sum_signal(0.0f, 0.0f);
-                for (const auto& tgt : targets) 
-                {
-                    float tau = 2.0f * (tgt.range + tgt.velocity * totalTime) / C;
-                    float phase = 2.0f * PI * (SLOPE * tau * t + FC * tau);
-                    sum_signal += std::polar(tgt.amplitude, phase);
-                }
-                inputData[i * NUM_SAMPLES + j] = sum_signal;
-            }
-        }
-    }
-    else
-    {
-        inputData = {};
+    if (inputData.size() != TOTAL_SIZE) {
+        inputData.clear();
         printf("InputData size Yanlis!!!!! \n");
+        return;
+    }
+
+    std::mt19937 rng(seed);
+
+    for (int i = 0; i < NUM_CHIRPS; ++i) {
+        for (int j = 0; j < NUM_SAMPLES; ++j) {
+            float t = (float)j / NUM_SAMPLES * CHIRP_DURATION;
+            float totalTime = i * CHIRP_DURATION + t;
+
+            Complex sum_signal(0.0f, 0.0f);
+
+            for (const auto& tgt : targets) {
+                float R = tgt.range + tgt.velocity * totalTime;
+                float tau = 2.0f * R / C;
+
+                // Not: aşağıdaki faz modelin "beat" için kabaca çalışır, ama aşağıda daha doğru formülü de veriyorum.
+                float phase = 2.0f * PI * (SLOPE * tau * t + FC * tau);
+
+                // Basit genlik: tgt.amplitude
+                sum_signal += std::polar(tgt.amplitude, phase);
+            }
+
+            // AWGN ekle
+            addComplexAwgn(sum_signal, noise_sigma, rng);
+
+            inputData[i * NUM_SAMPLES + j] = sum_signal;
+        }
     }
 }
 

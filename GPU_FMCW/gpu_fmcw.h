@@ -8,11 +8,13 @@ private:
     
     float fgpuTime;
     float fgpuComputeTime;
-    
+    float cfarComputeTime;
+
     std::string strDosyaAdi;
 
     std::vector<float> vfgpuTime;
     std::vector<float> vfgpuComputeTime;
+    std::vector<float> vfCfargpuTime;
     std::vector<Complex> output;
     
     float* f_data;
@@ -22,8 +24,9 @@ private:
     cuComplex *d_transposed;
     cuComplex *d_transposed_all;
 
-    cudaEvent_t start, stop; 
-    cudaEvent_t start2, stop2; 
+    cudaEvent_t start_total, stop_total; 
+    cudaEvent_t start_fmcw_compute, stop_fmcw_compute; 
+    cudaEvent_t start_cfar_compute, stop_cfar_compute; 
 
     cufftHandle plan;
     cufftHandle planRange;
@@ -55,6 +58,7 @@ public:
 
     float getGpuTime();
     float getGpuComputeTime();
+    float getCfarGpuComputeTime();
     std::string getDosyaAdi();
     float* getOutput();
 

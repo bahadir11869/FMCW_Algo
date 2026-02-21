@@ -8,8 +8,11 @@ class cpu_fmcw
 {
 private:
     void cpu_recursive_fft(std::vector<Complex>& a); 
-    float fcpuTime; 
+    float fmcwCpuTime;
+    float cfarCpuTime;
+
     std::vector<float> vfcpuTime;
+    std::vector<float> vCfarCpuTime;
     std::string strDosyaAdi;
     std::vector<Complex> output;
     DFTI_DESCRIPTOR_HANDLE handRange;
@@ -27,6 +30,7 @@ public:
     void run_cpu_avx(Complex* input, Complex* ptroutput);
 
     float getCpuTime();
+    float getCfarCpuTime();
     std::string getFileName();
     float* getOutput();
 };
