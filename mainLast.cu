@@ -23,7 +23,7 @@ int main()
     long long transferred_bytes = TOTAL_SIZE * sizeof(float) + TOTAL_ELEMENTS * sizeof(float);
     std::vector<float> detectionMap(TOTAL_SIZE);
 
-    readBin("radar_raw_frameBin/000006.bin", fullData);
+    readBin("radar_raw_frameBin/000096.bin", fullData);
     
 
     int iTekrarSayisi = 10;

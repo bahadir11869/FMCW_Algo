@@ -20,8 +20,8 @@ void AVXCFAR::update_params(CFARParams params)
         N_ref = big_area - guard_area;
 
         // Alpha hesabı (CA-CFAR)
-        alpha = float(std::pow(P.pfa, -1.0f / N_ref) - 1.0f);
-        
+        alpha =  N_ref  *  (std::pow(P.pfa, -1.0f / N_ref) - 1.0f);
+        alpha /=  (float)N_ref;  
         // Çarpma işlemini hızlandırmak için bölme işlemini peşinen yapıyoruz
 }
 
@@ -74,12 +74,9 @@ void AVXCFAR::process(CFARData& d)
     const int win_c = P.ref_c + P.guard_c;
     const int gr = P.guard_r;
     const int gc = P.guard_c;
-
+    
     // AVX sabiti: Alpha Normalized
     __m256 v_alpha = _mm256_set1_ps(alpha);
-
-    // 2. Kenar Temizliği (Garbage değerleri önlemek için)
-    std::fill(d.truth, d.truth + rows * cols, false);
 
     // 3. Sliding Window (AVX ile Hızlandırılmış)
     // Kenarlardan (margin) kaçınarak döngü kuruyoruz

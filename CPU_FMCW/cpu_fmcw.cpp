@@ -32,8 +32,10 @@ cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
     
     sumVector = new float[TOTAL_SIZE];
     printf("Sumvector 0 : %f", sumVector[0]);
-    memset(sumVector, 0.0, TOTAL_SIZE);    
+    memset(sumVector, 0.0, TOTAL_SIZE * sizeof(float));    
     cfarData.truth = new bool[TOTAL_SIZE];
+    memset(cfarData.truth,false, TOTAL_SIZE * sizeof(bool));    
+
 }
 
 cpu_fmcw::~cpu_fmcw()
@@ -153,17 +155,13 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
     DftiComputeForward(handDoppler, (void*)all_transposed);
     // 4. Coherent Summation
     std::memset(ptroutput, 0, TOTAL_SIZE * sizeof(Complex));
-     float temp = 0.0; 
-    #pragma omp parallel for
+     #pragma omp parallel for
     for (int n = 0; n < TOTAL_SIZE; ++n) {
-        Complex sum(0, 0);
-        
-       
+        float temp = 0.0f;
         for (int ch = 0; ch < NUM_CHANNELS; ++ch) {
             temp += std::norm(all_transposed[ch * TOTAL_SIZE + n]);
         }
         sumVector[n] = temp;
-        temp = 0.0;
     }
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     avxcfar.process(cfarData);
