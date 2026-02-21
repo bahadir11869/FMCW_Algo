@@ -5,16 +5,13 @@ import matplotlib.pyplot as plt
 import time
 
 test_configurations = [
-    (32, 16),
-    (64, 32),
-    (128, 64),
     (256, 128),
     (512, 256),
     (1024, 512),
     (1024, 1024),
     (2048, 512),
     (2048, 1024),
-    (2048, 2048),
+    (2048, 2048)
 ]
 
 
@@ -23,88 +20,74 @@ EXE_NAME = "FMCW_Algo2.exe"
 
 
 HEADER_FILE = "../defines.h"
-PYTHON_FILE = "main.py"
 
 def update_defines(chirps, samples):
-    
-    with open(HEADER_FILE, "r") as f:
+    with open(HEADER_FILE, "r", encoding="utf-8") as f:
         content = f.read()
     
     content = re.sub(r"const int NUM_CHIRPS = \d+;", f"const int NUM_CHIRPS = {chirps};", content)
     content = re.sub(r"const int NUM_SAMPLES = \d+;", f"const int NUM_SAMPLES = {samples};", content)
+    content = re.sub(r"const int REF_R = \d+;", f"const int REF_R = {chirps/32};", content)
+    content = re.sub(r"const int REF_C = \d+;", f"const int REF_C = {chirps/32};", content)
+    content = re.sub(r"const int GUARD_R = \d+;", f"const int GUARD_R = {chirps/128};", content)
+    content = re.sub(r"const int GUARD_C = \d+;", f"const int GUARD_C = {chirps/128};", content)
     
-    with open(HEADER_FILE, "w") as f:
+    with open(HEADER_FILE, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"-> Ayarlar güncellendi: {chirps} x {samples}")
-
-    with open(PYTHON_FILE, "r") as f:
-        content = f.read()
     
-    content = re.sub(r"NUM_CHIRPS = \d+", f"NUM_CHIRPS = {chirps}", content)
-    content = re.sub(r"NUM_SAMPLES = \d+", f"NUM_SAMPLES = {samples}", content)
-
-    with open(PYTHON_FILE, "w") as f:
-        f.write(content)
     print(f"-> Python Ayarlar güncellendi: {chirps} x {samples}")
 
 def parse_output(output_text):
     
     data = {}
     data2 = {}
-        
+    dataCfar = {} 
+    
     lines = output_text.split('\n')
     for line in lines:
-        if "Shared yok" in line:
-            t = re.search(r"total time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-            c = re.search(r"Compute time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-
-            if t and c: 
-                data['shared_yok_total'] = float(t.group(1))
-                data2['shared_yok_compute'] = float(c.group(1))
-            
-        if "Shared Mem" in line:
-            t = re.search(r"total time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-            c = re.search(r"Compute time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
+        if "Manuel FFT" in line:
+            t = re.search(r"TOTAL time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
+            c = re.search(r"FMCW time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
+            cfar = re.search(r"CFAR time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
 
             if t and c: 
                 data['shared_mem_total'] = float(t.group(1))
-                data2['shared_mem_compute'] = float(c.group(1))
-
-        if "Shared Stream" in line:
-            t = re.search(r"total time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-            c = re.search(r"Compute time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-
-            if t and c: 
-                data['shared_stream_total'] = float(t.group(1))
-                data2['shared_stream_compute'] = float(c.group(1))
-
-        if "1DFFT" in line:
-            t = re.search(r"total time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-            c = re.search(r"Compute time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-
-            if t and c: 
-                data['1DFFT_total'] = float(t.group(1))
-                data2['1DFFT_compute'] = float(c.group(1))
+                data2['shared_mem_fmcw'] = float(c.group(1))
+                dataCfar['shared_mem_cfar'] = float(cfar.group(1))
 
         if "2D_FFT" in line:
-            t = re.search(r"total time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-            c = re.search(r"Compute time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
-
+            t = re.search(r"TOTAL time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
+            c = re.search(r"FMCW time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
+            cfar = re.search(r"CFAR time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)
             if t and c: 
                 data['2DFFT_total'] = float(t.group(1))
-                data2['2DFFT_compute'] = float(c.group(1))
+                data2['2DFFT_fmcw'] = float(c.group(1))
+                dataCfar['2DFFT_cfar'] = float(cfar.group(1))
 
-        if "Recursive FFT" in line:
-            normal = re.search(r"FFT time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)           
-            openMP = re.search(r"OpenMP time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)           
-            AVX = re.search(r"AVX Total time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)  
-            if normal and openMP and AVX:
-                data['CPU_Normal'] = float(normal.group(1))
-                data['CPU_openMP'] = float(openMP.group(1))
-                data['CPU_AVX'] = float(AVX.group(1))
+        if "Recurisive FFT" in line:
+            fmcw = re.search(r"FMCW time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)           
+            cfar = re.search(r"CFAR time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)           
+            total = re.search(r"TOTAL time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)  
+            if fmcw and cfar and total:
+                data['CPU_total'] = float(total.group(1))
+                data2['CPU_fmcw'] = float(fmcw.group(1))
+                dataCfar['CPU_cfar'] = float(cfar.group(1))
 
 
-    return data, data2 
+        if "AVX FFT" in line:
+            total = re.search(r"TOTAL time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)  
+            fmcw = re.search(r"FMCW time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)           
+            cfar = re.search(r"CFAR time[:\s]+(\d+\.\d+)", line, re.IGNORECASE)           
+            if fmcw and cfar and total:
+                data['AVX_total'] = float(total.group(1))
+                data2['AVX_fmcw'] = float(fmcw.group(1))
+                dataCfar['AVX_cfar'] = float(cfar.group(1))
+
+
+    
+
+    return data, data2, dataCfar 
 
 def run_tests():
     results = []
@@ -136,14 +119,15 @@ def run_tests():
                                      cwd=parent_dir)
             program_output = process.stdout
             
-            totaltimes, computetimes = parse_output(program_output)
+            totaltimes, computetimes, cfartimes = parse_output(program_output)
             
             if totaltimes and computetimes:
                 results.append({
                     "label": f"{chirps}x{samples}",
                     "points": chirps * samples,
                     "totaltimes": totaltimes,
-                    "computetimes" :computetimes
+                    "computetimes" :computetimes,
+                    "cfartimes": cfartimes
                 })
             else:
                 print("UYARI: Çıktıdan süre okunamadı. Program çıktısı:")
@@ -162,24 +146,24 @@ def plot_benchmark(results):
     labels = [r['label'] for r in results]
     
     y_total_sets = [
-        ([r['totaltimes'].get('CPU_Normal', 0) for r in results], 'CPU Recursive FFT', 'm', 'v', '--'),
-        ([r['totaltimes'].get('CPU_openMP', 0) for r in results], 'CPU Recursive FFT OpenMP', 'pink', 'D', '--'),
-        ([r['totaltimes'].get('CPU_AVX', 0) for r in results], 'CPU AVX', 'black', '+', '--'),
-        ([r['totaltimes'].get('shared_yok_total', 0) for r in results], 'Shared Yok', 'orange', 'x', '--'),
-        ([r['totaltimes'].get('shared_mem_total', 0) for r in results], 'Shared Mem', 'green', 'o', '-'),
-        ([r['totaltimes'].get('shared_stream_total', 0) for r in results], 'Shared Stream', 'blue', '^', ':'),
-        ([r['totaltimes'].get('1DFFT_total', 0) for r in results], '1D FFT', 'red', 's', '-.'),
-        ([r['totaltimes'].get('2DFFT_total', 0) for r in results], '2D FFT', 'purple', '*', '-') 
+        ([r['totaltimes'].get('CPU_total', 0) for r in results], 'CPU OpenMP FFT', 'm', 'v', '--'),
+        ([r['totaltimes'].get('AVX_total', 0) for r in results], 'CPU AVX', 'black', '+', '--'),
+        ([r['totaltimes'].get('shared_mem_total', 0) for r in results], 'GPU Shared Mem', 'green', 'o', '-'),
+        ([r['totaltimes'].get('2DFFT_total', 0) for r in results], 'GPU 2D FFT', 'purple', '*', '-') 
     ]
 
     y_compute_sets = [
-        ([r['computetimes'].get('shared_yok_compute', 0) for r in results], 'Shared Yok', 'orange', 'x', '--'),
-        ([r['computetimes'].get('shared_mem_compute', 0) for r in results], 'Shared Mem', 'green', 'o', '-'),
-        ([r['computetimes'].get('shared_stream_compute', 0) for r in results], 'Shared Stream', 'blue', '^', ':'),
-        ([r['computetimes'].get('1DFFT_compute', 0) for r in results], '1D FFT', 'red', 's', '-.'),
-        ([r['computetimes'].get('2DFFT_compute', 0) for r in results], '2D FFT', 'purple', '*', '-') # Marker değişti (*)
+        ([r['computetimes'].get('CPU_fmcw', 0) for r in results], 'CPU OpenMP FFT', 'blue', '^', ':'),
+        ([r['computetimes'].get('AVX_fmcw', 0) for r in results], 'CPU AVX', 'red', 's', '-.'),
+        ([r['computetimes'].get('shared_mem_fmcw', 0) for r in results], 'GPU Shared Mem', 'green', 'o', '-'),
+        ([r['computetimes'].get('2DFFT_fmcw', 0) for r in results], 'GPU 2D FFT', 'purple', '*', '-') # Marker değişti (*)
     ]
-
+    y_cfar_compute_sets = [
+        ([r['cfartimes'].get('CPU_cfar', 0) for r in results], 'CPU OpenMP FFT', 'blue', '^', ':'),
+        ([r['cfartimes'].get('AVX_cfar', 0) for r in results], 'CPU AVX', 'red', 's', '-.'),
+        ([r['cfartimes'].get('shared_mem_cfar', 0) for r in results], 'GPU Shared Mem', 'green', 'o', '-'),
+        ([r['cfartimes'].get('2DFFT_cfar', 0) for r in results], 'GPU 2D FFT', 'purple', '*', '-') # Marker değişti (*)
+    ]
     plt.figure(figsize=(14, 8))
 
     for data, label, color, marker, style in y_total_sets:
@@ -193,7 +177,7 @@ def plot_benchmark(results):
                              ha='center', va='bottom', 
                              fontsize=8, fontweight='bold', color=color)
     
-    plt.title("FMCW Radar Processing: Total Execution Time")
+    plt.title("FMCW-CFAR Radar Processing: Total Execution Time")
     plt.xlabel("Configuration (Chirps x Samples)")
     plt.ylabel("Time (ms)")
     plt.yscale('log') 
@@ -226,6 +210,31 @@ def plot_benchmark(results):
     plt.savefig("benchmark_compute_time.png")
     print("Grafik 2 Kaydedildi: benchmark_compute_time.png")
     
+    plt.figure(figsize=(14, 8))
+
+    for data, label, color, marker, style in y_cfar_compute_sets:
+        plt.plot(labels, data, label=label, color=color, marker=marker, linestyle=style)
+        
+        for i, val in enumerate(data):
+            if val > 0:
+                plt.annotate(f"{val:.2f}", 
+                             xy=(i, val), 
+                             xytext=(0, 5), 
+                             textcoords="offset points",
+                             ha='center', va='bottom', 
+                             fontsize=8, fontweight='bold', color=color)
+
+    plt.title("CFAR Processing: Compute Time Only (Log Scale)")
+    plt.xlabel("Configuration (Chirps x Samples)")
+    plt.ylabel("Time (ms)")
+    plt.yscale('log')
+    plt.legend()
+    plt.grid(True, alpha=0.3, which="both", ls="-") 
+    plt.tight_layout()
+    plt.savefig("benchmark_cfar_compute_time.png")
+    print("Grafik cfar Kaydedildi: benchmark_cfar_compute_time.png")
+    
+
     plt.show()
 
 if __name__ == "__main__":

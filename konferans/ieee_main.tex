@@ -1,0 +1,236 @@
+\documentclass[conference, a4paper]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage[super]{nth}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[hyphens]{url}
+\usepackage{hyperref}
+\hypersetup{breaklinks=true}
+\usepackage{xcolor}
+\usepackage{balance}
+\usepackage{cite}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage[cmex10]{amsmath}
+\usepackage[lofdepth,lotdepth]{subfig}
+\usepackage{amsfonts}
+\usepackage{diagbox}
+\usepackage{makecell}
+
+\hyphenation{op-tical net-works semi-conduc-tor}
+\setlength{\textfloatsep}{5pt}
+
+\begin{document}
+
+\title{High-Performance GPU Acceleration of FMCW Radar Signal Processing and 2D CA-CFAR Detection}
+
+\author{
+\IEEEauthorblockN{Bahadır Çeliktaş}
+\IEEEauthorblockA{
+\textit{ASELSAN A.Ş.}\\
+Ankara, Türkiye \\
+bahadirce@aselsan.com \\
+ORCID: 0009-0008-5586-9922}
+\and
+\IEEEauthorblockN{Eşrefhan Kadıoğlu}
+\IEEEauthorblockA{
+\textit{ASELSAN A.Ş.}\\
+Ankara, Türkiye \\
+esrefhankadi@aselsan.com \\
+ORCID: 0009-0000-8607-7081}
+}
+
+\maketitle
+
+\begin{abstract}
+Modern FMCW radar systems generate large-scale high-resolution data requiring computationally intensive signal processing. 
+Range–Doppler spectrum generation via multi-dimensional FFT operations and subsequent 2D CA-CFAR detection introduce significant latency when executed on CPU architectures. 
+This paper presents a unified GPU-accelerated radar signal processing pipeline integrating FFT-based spectral processing and adaptive CFAR detection. 
+Multiple CPU and CUDA-based implementations are systematically compared, including naive, SIMD-optimized, summed-area-table-based, and shared-memory-optimized kernels. 
+Experimental results demonstrate speedups of up to $280\times$ over baseline CPU implementations while preserving numerical accuracy and detection performance. 
+A detailed bandwidth and bottleneck analysis shows that once computation is accelerated, PCIe data transfer becomes the dominant constraint.
+\end{abstract}
+
+\begin{IEEEkeywords}
+FMCW Radar, GPU Acceleration, CUDA, FFT, CA-CFAR, High-Performance Computing
+\end{IEEEkeywords}
+
+\section{Introduction}
+Frequency Modulated Continuous Wave (FMCW) radar systems determine target range and velocity through multi-stage digital signal processing. The Range–Doppler map is obtained via sequential FFT operations along fast-time and slow-time dimensions, followed by adaptive detection using Constant False Alarm Rate (CFAR) algorithms. 
+
+As radar resolution increases, matrix sizes frequently exceed $2048 \times 2048$, making real-time processing challenging on CPU architectures. Although multi-threading and SIMD-based optimizations provide partial improvements, they remain insufficient for large-scale deployments. 
+
+Graphics Processing Units (GPUs) offer massive data-level parallelism, enabling significant acceleration of FFT and sliding-window detection operations. This study proposes a unified GPU-accelerated FMCW radar processing pipeline and evaluates multiple optimization strategies.
+
+\section{Related Work}
+
+GPU-based acceleration of radar processing has been widely investigated. 
+Venter \textit{et al.} \cite{venter2011} implemented CA-CFAR on GPU architectures, demonstrating substantial performance gains over CPU implementations for sliding-window detection.
+
+Zhao \textit{et al.} \cite{zhao2023} presented a GPU-accelerated radar processing pipeline integrating Range–Doppler processing and CFAR detection using CUDA and cuFFT, emphasizing memory optimization strategies.
+
+Liu \textit{et al.} \cite{liu2023} proposed a real-time GPU-based radar processing framework for MIMO systems, highlighting architectural considerations for sustaining real-time throughput.
+
+GPU acceleration has also been applied to Range–Doppler algorithms in FMCW-based SAR systems, where kernel fusion and pinned memory reduce data-transfer overhead \cite{jung2023}.
+
+Despite these advances, few works provide a unified framework that systematically compares multiple CPU and GPU implementations of both FFT and 2D CA-CFAR under identical experimental conditions.
+\section{Methodology}
+
+This study presents a unified FMCW radar signal processing framework integrating 2D FFT-based range–Doppler estimation with CA-CFAR detection, accelerated using GPU architectures. The objective is to reduce computational complexity for large radar data cubes and enable real-time processing performance.
+
+\subsection{FMCW Signal Model}
+
+An FMCW radar transmits a linear frequency-modulated (LFM) chirp signal expressed as \cite{richards2014}:
+
+\begin{equation}
+s_t(t) = A \exp \left( j 2\pi \left( f_c t + \frac{B}{2T} t^2 \right) \right)
+\end{equation}
+
+where $f_c$ is the carrier frequency, $B$ is the sweep bandwidth, and $T$ is the chirp duration.
+
+The received echo from a target at range $R$ is delayed by $\tau = \frac{2R}{c}$ and given by:
+
+\begin{equation}
+s_r(t) = A \exp \left( j 2\pi \left( f_c (t-\tau) + \frac{B}{2T} (t-\tau)^2 \right) \right)
+\end{equation}
+
+After dechirping, the intermediate beat frequency becomes:
+
+\begin{equation}
+f_b = \frac{B}{T} \tau
+\end{equation}
+
+Thus, the target range is estimated as \cite{richards2014}:
+
+\begin{equation}
+R = \frac{cT}{2B} f_b
+\end{equation}
+
+\subsection{Range–Doppler Processing}
+
+Range and velocity estimation are performed using two-dimensional FFT operations across the fast-time and slow-time dimensions \cite{richards2014}. The discrete Fourier transform (DFT) applied in the range dimension is defined as:
+
+\begin{equation}
+X(k) = \sum_{n=0}^{N-1} x(n) e^{-j 2\pi kn/N}
+\end{equation}
+
+where $N$ represents the number of ADC samples per chirp.
+
+Subsequently, Doppler processing is performed across $M$ chirps:
+
+\begin{equation}
+S(k,m) = \sum_{l=0}^{M-1} X(k,l) e^{-j 2\pi ml/M}
+\end{equation}
+
+The resulting 2D FFT produces the range–Doppler map. Since each FFT stage has computational complexity $O(N \log N)$, the overall processing cost becomes significant for large grids. GPU acceleration of FFT-based radar algorithms has been shown to provide substantial performance improvements in similar radar systems \cite{jung2023,zhao2023,liu2023}.
+
+\subsection{CA-CFAR Detection}
+
+To detect targets within the range–Doppler map, a two-dimensional Cell-Averaging Constant False Alarm Rate (CA-CFAR) detector is employed. The CA-CFAR algorithm computes an adaptive threshold using surrounding reference cells \cite{venter2011}.
+
+For each Cell Under Test (CUT), the threshold is calculated as:
+
+\begin{equation}
+T = \alpha \cdot \frac{1}{N_r} \sum_{i=1}^{N_r} P_i
+\end{equation}
+
+where $N_r$ denotes the number of reference cells, $P_i$ represents the power of the $i$-th reference cell, and $\alpha$ is a scaling factor determined by the desired probability of false alarm.
+
+Naive implementations require repeated summation over sliding windows, resulting in high computational cost. To reduce this complexity, a Summed-Area Table (SAT) approach is adopted \cite{crow1984}. The SAT enables constant-time window summation, significantly reducing the computational overhead of the CFAR stage. GPU implementations of CA-CFAR have demonstrated substantial acceleration compared to CPU-based solutions \cite{venter2011}.
+
+\subsection{Processing Pipeline}
+
+The complete radar signal processing pipeline consists of the following stages:
+
+\begin{enumerate}
+    \item ADC Data Acquisition
+    \item Range FFT (Fast-Time FFT)
+    \item Doppler FFT (Slow-Time FFT)
+    \item Matrix Transpose
+    \item 2D CA-CFAR Detection
+\end{enumerate}
+
+The transpose stage is included to optimize memory access patterns, particularly for GPU architectures where coalesced memory access is critical for performance \cite{liu2023,zhao2023}.
+
+\subsection{CPU Implementations}
+
+The CPU baseline implementations include:
+
+\begin{itemize}
+    \item Multi-threaded FFT execution
+    \item SIMD vectorization
+    \item SAT-based CFAR optimization
+\end{itemize}
+
+These techniques aim to exploit instruction-level and thread-level parallelism.
+
+\subsection{GPU Implementations}
+
+CUDA-based implementations are developed to leverage massive parallelism and high memory bandwidth:
+
+\begin{itemize}
+    \item Shared-memory optimized FFT kernels
+    \item Custom transpose kernels for coalesced access
+    \item Fully parallel GPU-based SAT-CFAR implementation
+    \item Vendor-optimized FFT baseline for comparison
+\end{itemize}
+
+Prior studies demonstrate that GPU-accelerated radar signal processing pipelines significantly outperform CPU-based systems in real-time scenarios \cite{jung2023,zhao2023,liu2023}. The proposed framework integrates FMCW modeling, 2D FFT processing, and SAT-accelerated CA-CFAR into a unified GPU-optimized architecture suitable for high-resolution real-time radar applications.
+
+
+\section{Experimental Setup}
+
+Experiments were conducted on NVIDIA RTX 4090 GPUs. Radar grids up to $2048 \times 2048$ were evaluated. 
+
+Performance metrics include:
+
+\begin{itemize}
+    \item Kernel Compute Time
+    \item Total Execution Time
+    \item Effective Memory Bandwidth
+    \item Speedup Factor
+    \item Probability of Detection ($P_d$)
+    \item Empirical False Alarm Rate ($P_{fa}$)
+    \item RMSE for numerical validation
+\end{itemize}
+
+\section{Results and Discussion}
+
+GPU cuFFT achieved up to 280× speedup over recursive CPU FFT. Shared-memory optimized kernels approached vendor-level performance. GPU SAT-CFAR achieved up to 48× acceleration over naive CPU implementations while maintaining detection accuracy.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Performance Comparison Summary\textcolor{red}{TODO: gercek veri seti konulacak}}
+    \renewcommand{\arraystretch}{1.1}
+    \begin{tabular}{c|ccc}
+        \toprule
+        \textbf{Implementation} & \textbf{Compute (ms)} & \textbf{Total (ms)} & \textbf{Speedup} \\
+        \midrule
+        CPU Recursive & 683.85 & 684 & 1× \\
+        CPU AVX & 9.28 & 9.28 & 74.5× \\
+        GPU Shared FFT & 0.58 & 4.32 & 158× \\
+        GPU cuFFT & 0.25 & 1.80 & 280× \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:performance}
+\end{table}
+
+As compute time decreased below 1 ms, PCIe transfer latency became the dominant bottleneck.
+
+\section{Conclusion}
+
+This study presented a unified GPU-accelerated FMCW radar signal processing and CFAR detection framework.
+Significant acceleration was achieved while maintaining numerical accuracy and detection integrity.
+Future optimizations should focus on overlapping data transfers and kernel execution to mitigate PCIe bottlenecks.
+
+\balance
+
+\bibliographystyle{ieeetr}
+\bibliography{references}
+
+\end{document}

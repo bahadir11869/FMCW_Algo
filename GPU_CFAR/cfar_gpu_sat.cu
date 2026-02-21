@@ -71,7 +71,6 @@ __global__ void sat_row_prefix_warp(
 
     size_t row_offset = (size_t)r * cols;
     float running_sum = 0.0f;
-
     // Sat�r� 32'lik paketler halinde gez
     for (int c = 0; c < cols; c += 32) {
         int col_idx = c + lane_id;
@@ -220,8 +219,8 @@ void GPUCFAR_SAT::process(const CFARParams& p, float* d, bool* b)
     dim3 grid_rows((rows + warps_per_block - 1) / warps_per_block);
     dim3 block_rows(threads);
 
-
     sat_row_prefix_warp << <grid_rows, block_rows >> > (d, d_sat, rows, cols);
+    
     CUDA_CHECK(cudaGetLastError());
 
     // 3. SAT Col Prefix (STANDARD - Already Optimized)

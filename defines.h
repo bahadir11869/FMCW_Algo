@@ -20,8 +20,12 @@ namespace fs = std::filesystem;
 
 const int NUM_TX = 1;
 const int NUM_RX = 1;
-const int NUM_CHIRPS = 256;      // Slow Time (Y)
-const int NUM_SAMPLES = 128;     // Fast Time (X)
+const int NUM_CHIRPS = 2048;      // Slow Time (Y)
+const int NUM_SAMPLES = 2048;     // Fast Time (X)
+const int REF_R = 8.0;
+const int REF_C = 8.0;
+const int GUARD_R = 2.0;
+const int GUARD_C = 2.0;
 const int NUM_CHANNELS = NUM_TX * NUM_RX; 
 const int TOTAL_SIZE = NUM_CHIRPS * NUM_SAMPLES;
 const int TOTAL_ELEMENTS = TOTAL_SIZE * NUM_TX * NUM_RX;
@@ -55,8 +59,8 @@ class CFARParams {
 public:
     int rows = NUM_SAMPLES, cols = NUM_CHIRPS ;
     float snr_db = 10.0f;             // güç SNR (dB)
-    int ref_r = 8, ref_c = 8;
-    int guard_r = 2, guard_c = 2;
+    int ref_r = REF_R, ref_c = REF_C;
+    int guard_r = GUARD_R, guard_c = GUARD_C;
     float pfa = 1e-6f;
 };
 
