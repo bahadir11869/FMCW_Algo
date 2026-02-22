@@ -74,6 +74,7 @@ def plot_in_new_window(title_prefix, power_map, mask_map):
                  ha='center', va='center')
 
     fig.tight_layout()
+    plt.savefig(title_prefix + ".png")
 
 
 def main():
