@@ -84,12 +84,15 @@ int main()
     
 
     printf("CPU Recurisive FFT OpenMP  FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms\n", cpuFMCWManuel.getCpuTime(), cpuFMCWManuel.getCfarCpuTime(), cpuFMCWManuel.getCpuTime() + cpuFMCWManuel.getCfarCpuTime());
+    fflush(stdout);
     printf("CPU AVX FFT OpenMP         FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms\n", cpuFMCWAVX.getCpuTime(), cpuFMCWAVX.getCfarCpuTime(), cpuFMCWAVX.getCpuTime() + cpuFMCWAVX.getCfarCpuTime());
-
+    fflush(stdout);
     printf("GPU Manuel FFT Shared Mem: FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms \n", gpuManuelSHM.getGpuComputeTime(), gpuManuelSHM.getCfarGpuComputeTime(), gpuManuelSHM.getGpuTime());    
+    fflush(stdout);
     printf("2D_FFT                     FMCW time: %f ms, CFAR time: %f ms, TOTAL time: %f ms \n", gpu2DFFT.getGpuComputeTime(), gpu2DFFT.getCfarGpuComputeTime(), gpu2DFFT.getGpuTime());    
-
+    fflush(stdout);
     cudaFreeHost(h_pinned_input);
     cudaFreeHost(h_pinned_outputCPU);
     cudaFreeHost(h_pinned_outputGPU);
+    return 0;
 }

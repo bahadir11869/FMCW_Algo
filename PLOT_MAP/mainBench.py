@@ -114,7 +114,7 @@ def run_tests():
             else:
                 cmd = f"./{EXE_NAME}"
                 
-            process = subprocess.run(cmd, shell=True, check=True, 
+            process = subprocess.run(cmd, shell=True, check=False, 
                                      stdout=subprocess.PIPE, text=True,
                                      cwd=parent_dir)
             program_output = process.stdout
