@@ -22,9 +22,9 @@ const int NUM_TX = 2;
 const int NUM_RX = 4;
 const int NUM_CHIRPS = 256;      // Slow Time (Y)
 const int NUM_SAMPLES = 128;     // Fast Time (X)
-const int REF_R = 8;
+const int REF_R = 4;
 const int REF_C = 8;
-const int GUARD_R = 6;
+const int GUARD_R = 3;
 const int GUARD_C = 10;
 const int NUM_CHANNELS = NUM_TX * NUM_RX; 
 const int TOTAL_SIZE = NUM_CHIRPS * NUM_SAMPLES;
@@ -163,37 +163,42 @@ inline void calculate_RMSE_Vectors(const std::vector<T>& cpu_vec,
 
 // CFAR tespitlerini hareketli ve durağan olarak ayırıp her grupta kendi içinde filtreler.
 // Böylece güçlü bir clutter (Doppler≈0) hareketli hedefleri bastıramaz.
-// rows = NUM_CHIRPS, cols = NUM_SAMPLES, harita fftshift sonrası [Doppler][Range] düzeninde.
+// Bellek düzeni: [Range][Doppler] → indeks = r * num_doppler + v
+// fftshift sonrası: v = num_doppler/2 → sıfır Doppler
 inline void applyPeakRelativeFilter(bool* detections, const float* power,
-                                     int rows, int cols,
+                                     int num_range, int num_doppler,
                                      int doppler_gate = 2,
                                      float dB_threshold = 20.0f)
 {
-    int center = rows / 2;  // fftshift sonrası sıfır-Doppler satırı
+    const int center = num_doppler / 2;  // fftshift sonrası sıfır-Doppler bin'i
 
     float max_moving     = 0.0f;
     float max_stationary = 0.0f;
 
-    for (int i = 0; i < rows * cols; ++i) {
-        if (!detections[i]) continue;
-        int dopp_offset = std::abs(i / cols - center);
-        if (dopp_offset > doppler_gate)
-            max_moving     = std::max(max_moving,     power[i]);
-        else
-            max_stationary = std::max(max_stationary, power[i]);
+    for (int r = 0; r < num_range; ++r) {
+        for (int v = 0; v < num_doppler; ++v) {
+            int i = r * num_doppler + v;
+            if (!detections[i]) continue;
+            if (std::abs(v - center) > doppler_gate)
+                max_moving     = std::max(max_moving,     power[i]);
+            else
+                max_stationary = std::max(max_stationary, power[i]);
+        }
     }
 
-    float factor       = std::pow(10.0f, dB_threshold / 10.0f);
-    float min_moving   = max_moving     / factor;
-    float min_static   = max_stationary / factor;
+    const float factor     = std::pow(10.0f, dB_threshold / 10.0f);
+    const float min_moving = max_moving     / factor;
+    const float min_static = max_stationary / factor;
 
-    for (int i = 0; i < rows * cols; ++i) {
-        if (!detections[i]) continue;
-        int dopp_offset = std::abs(i / cols - center);
-        if (dopp_offset > doppler_gate) {
-            if (power[i] < min_moving)  detections[i] = false;
-        } else {
-            if (power[i] < min_static)  detections[i] = false;
+    for (int r = 0; r < num_range; ++r) {
+        for (int v = 0; v < num_doppler; ++v) {
+            int i = r * num_doppler + v;
+            if (!detections[i]) continue;
+            if (std::abs(v - center) > doppler_gate) {
+                if (power[i] < min_moving)  detections[i] = false;
+            } else {
+                if (power[i] < min_static)  detections[i] = false;
+            }
         }
     }
 }

@@ -147,7 +147,7 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
     auto cfar = std::chrono::high_resolution_clock::now(); 
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     cpu_sat.process(cfarData);
-    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_CHIRPS, NUM_SAMPLES);
+    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_SAMPLES, NUM_CHIRPS);
     auto cfar_end = std::chrono::high_resolution_clock::now();
 
     fmcwCpuTime = std::chrono::duration<float, std::milli>(end - start).count();
@@ -206,7 +206,7 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
 
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     avxcfar.process(cfarData);
-    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_CHIRPS, NUM_SAMPLES);
+    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_SAMPLES, NUM_CHIRPS);
     auto cfar_end = std::chrono::high_resolution_clock::now();
 
     fmcwCpuTime = std::chrono::duration<float, std::milli>(end - start).count();

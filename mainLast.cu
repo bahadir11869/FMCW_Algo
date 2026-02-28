@@ -1,4 +1,9 @@
 // nvcc -arch=sm_86 -std=c++17 -O3  mainLast.cu --options-file compile2.txt;.\FMCW_Algo2.exe
+
+// gemine cli icin npx @google/gemini-cli
+// claude icin claude yazman yeterli
+
+
 #include "defines.h"
 #include "GPU_FMCW/gpu_fmcw.h"
 #include "CPU_FMCW/cpu_fmcw.h"
@@ -42,7 +47,7 @@ int main()
         gpu2DFFT.run_gpu_2DFFT(h_pinned_input, h_pinned_outputGPU);
         gpuErrchk(cudaDeviceSynchronize());
     }
-    applyPeakRelativeFilter(gpu2DFFT.bpCFAR, gpu2DFFT.getOutput(), NUM_CHIRPS, NUM_SAMPLES);
+    applyPeakRelativeFilter(gpu2DFFT.bpCFAR, gpu2DFFT.getOutput(), NUM_SAMPLES, NUM_CHIRPS);
     for(int i=0; i<TOTAL_SIZE; ++i) {
     detectionMap[i] = (gpu2DFFT.bpCFAR[i]) ? 1.0f : 0.0f;
     }
@@ -50,7 +55,7 @@ int main()
     save_rdm_data("GPU_FMCW/CFAR_2DFFT.csv", detectionMap.data(), true);
     save_rdm_data("GPU_FMCW/FFT_2DFFT.csv", gpu2DFFT.getOutput(), true);
 
-    applyPeakRelativeFilter(gpuManuelSHM.bpCFAR, gpuManuelSHM.getOutput(), NUM_CHIRPS, NUM_SAMPLES);
+    applyPeakRelativeFilter(gpuManuelSHM.bpCFAR, gpuManuelSHM.getOutput(), NUM_SAMPLES, NUM_CHIRPS);
     for(int i=0; i<TOTAL_SIZE; ++i) {
     detectionMap[i] = (gpuManuelSHM.bpCFAR[i]) ? 1.0f : 0.0f;
     }

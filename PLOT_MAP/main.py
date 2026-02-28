@@ -36,9 +36,8 @@ def create_figure_for_file(filename, custom_title="RDM Plot"):
         print(f"BOYUT HATASI: {filename} -> {data.shape}")
         return
     
-    # 1. Shift ve dB Dönüşümü
-    data_shifted = np.fft.fftshift(data, axes=0)
-    data_db = 20 * np.log10(np.abs(data_shifted) + 1e-9)
+    # 1. dB Dönüşümü (fftshift C++ tarafında zaten uygulandı)
+    data_db = 20 * np.log10(np.abs(data) + 1e-9)
 
     # 2. YENİ PENCERE OLUŞTURMA (Her çağrıldığında yeni ID alır)
     # figure() fonksiyonuna num=None verilirse her zaman yeni pencere açar.
@@ -71,8 +70,8 @@ if __name__ == "__main__":
     # --- BURAYA İSTEDİĞİN KADAR DOSYA EKLE ---
     # Format: ("Dosya Yolu", "Grafik Başlığı")
     files_to_plot = [
-        ("../GPU_FMCW/2DFFT_GPU.csv", "1. Method: 2D FFT GPU cuFFT"),
-        ("../GPU_FMCW/radar_mask.csv",     "2. Method: CPU AVX Lib"),
+        ("../CPU_FMCW/FFT_CPU.csv",  "1. Method: CPU Recursive FFT"),
+        ("../CPU_FMCW/CFAR_CPU.csv", "2. Method: CPU Recursive CFAR"),
     ]
 
     print("Grafikler hazırlanıyor...")
