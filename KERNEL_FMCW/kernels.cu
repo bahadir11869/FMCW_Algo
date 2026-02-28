@@ -120,6 +120,41 @@ __global__ void k_butterfly_stage(cuComplex* d_data, int n, int current_stage_wi
     }
 }
 
+__global__ void sumChannelsShiftKernel(
+    const cuComplex* __restrict__ d_transposed_all,
+    float*           __restrict__ fpCfarData,
+    int numChannels,
+    int numSamples,
+    int numChirps)
+{
+    // Her thread bir (range_bin=i, doppler_bin=j) çiftini işler
+    int i = blockIdx.x * blockDim.x + threadIdx.x; // range bin
+    int j = blockIdx.y * blockDim.y + threadIdx.y; // doppler bin
+
+    if (i >= numSamples || j >= numChirps) return;
+
+    int totalSize = numSamples * numChirps;
+
+    // i < 5: yakın mesafe (DC sızıntısı) → sıfır yaz, çık
+    if (i < 5)
+    {
+        fpCfarData[i * numChirps + j] = 0.0f;
+        return;
+    }
+
+    // Kanal toplamı (Non-Coherent Integration)
+    float power = 0.0f;
+    int in_idx = i * numChirps + j;
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        cuComplex val = d_transposed_all[ch * totalSize + in_idx];
+        power += val.x * val.x + val.y * val.y; // cuCabsf yerine direkt norm
+    }
+
+    // FFTShift: 0-Doppler'i merkeze kaydır
+    int shifted_j = (j + numChirps / 2) % numChirps;
+    fpCfarData[i * numChirps + shifted_j] = power;
+}
 
 __global__ void k_fft_shared(cuComplex* d_data, int n, int log2_n) 
 {

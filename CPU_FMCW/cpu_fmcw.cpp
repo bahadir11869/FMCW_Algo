@@ -29,10 +29,10 @@ cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
     DftiSetValue(handDoppler, DFTI_OUTPUT_DISTANCE, (MKL_LONG)NUM_CHIRPS);
     DftiCommitDescriptor(handDoppler);
 
-    Complex* all_transposed = nullptr;
-    
+    all_transposed = nullptr;
+
     sumVector = new float[TOTAL_SIZE];
-    memset(sumVector, 0.0, TOTAL_SIZE * sizeof(float));    
+    memset(sumVector, 0, TOTAL_SIZE * sizeof(float));    
     cfarData.truth = new bool[TOTAL_SIZE];
     memset(cfarData.truth,false, TOTAL_SIZE * sizeof(bool));    
 }
@@ -69,26 +69,25 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
 
     // Çıktıyı temizle ve boyutu ayarla (Tek bir kanal boyutunda)
     output.assign(TOTAL_SIZE, Complex(0.0f, 0.0f));
-    
+    memset(sumVector, 0, TOTAL_SIZE * sizeof(float));
     auto start = std::chrono::high_resolution_clock::now();
 
     // 8 Kanalı tek tek dönüyoruz
     #pragma omp parallel for num_threads(NUM_CHANNELS)
     for (int ch = 0; ch < NUM_CHANNELS; ++ch) 
     {
-        // 1. Mevcut kanalın verisini al (Offset hesaplama)
-        // Python'da [TX][RX][Chirp][Sample] düzeninde kaydettiğimiz için:
         int channelOffset = ch * TOTAL_SIZE;
         std::vector<Complex> channelData(TOTAL_SIZE);
         for(int n = 0; n < TOTAL_SIZE; ++n) {
             channelData[n] = input[channelOffset + n];
         }
 
-        // 2. Range FFT
+        // 2. Range FFT (pencere veri kaynağında uygulandı)
         for (int i = 0; i < NUM_CHIRPS; ++i) {
             std::vector<Complex> row(NUM_SAMPLES);
-            for(int j = 0; j < NUM_SAMPLES; ++j) 
+            for(int j = 0; j < NUM_SAMPLES; ++j) {
                 row[j] = channelData[i * NUM_SAMPLES + j];
+            }
             
             cpu_recursive_fft(row);
             
@@ -104,27 +103,52 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
         }
 
         // 4. Doppler FFT ve Kanalları Toplama
+        // Her thread kendi lokal buffer'ına yazar → critical section yok
+        std::vector<float> localSum(TOTAL_SIZE, 0.0f);
+
         for (int i = 0; i < NUM_SAMPLES; ++i) {
             std::vector<Complex> row(NUM_CHIRPS);
-            for(int j = 0; j < NUM_CHIRPS; ++j)
+
+            // Veriyi kopyala
+            for(int j = 0; j < NUM_CHIRPS; ++j) {
                 row[j] = transposed[i * NUM_CHIRPS + j];
+            }
             
+            /*
+            // DÜZELTME 1: MTI (Mean Subtraction) - Statik kargaşayı sil
+            Complex mean_val(0.0f, 0.0f);
+            for(int j = 0; j < NUM_CHIRPS; ++j) mean_val += row[j];
+            mean_val /= (float)NUM_CHIRPS;
+            for(int j = 0; j < NUM_CHIRPS; ++j) row[j] -= mean_val;
+            */
+
             cpu_recursive_fft(row);
 
-            // İmajiner değerleri koruyarak ana output'a ekle (Coherent Sum)
-            #pragma omp critical
-            for(int j=0; j<NUM_CHIRPS; ++j) 
+            // Güç hesabı (Non-Coherent Integration)
+            // i < 5: yakın mesafe (DC sızıntısı) → atla, localSum zaten 0
+            if(i >= 5)
             {
-                sumVector[i * NUM_CHIRPS + j] += std::norm(row[j]);
+                for(int j = 0; j < NUM_CHIRPS; ++j) 
+                {
+                    // FFTSHIFT: 0-Doppler'i merkeze kaydır
+                    int shifted_j = (j + NUM_CHIRPS / 2) % NUM_CHIRPS; 
+                    localSum[i * NUM_CHIRPS + shifted_j] += std::norm(row[j]);
+                }
             }
         }
+
+        // Thread-lokal sonuçları global sumVector'e tek seferde topla
+        #pragma omp critical
+        for(int k = 0; k < TOTAL_SIZE; ++k)
+            sumVector[k] += localSum[k];
     }
     auto end = std::chrono::high_resolution_clock::now();
 
     auto cfar = std::chrono::high_resolution_clock::now(); 
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     cpu_sat.process(cfarData);
-    auto cfar_end = std::chrono::high_resolution_clock::now(); 
+    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_CHIRPS, NUM_SAMPLES);
+    auto cfar_end = std::chrono::high_resolution_clock::now();
 
     fmcwCpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     cfarCpuTime =  std::chrono::duration<float, std::milli>(cfar_end - cfar).count();
@@ -154,15 +178,27 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
 
     // 3. Doppler FFT
     DftiComputeForward(handDoppler, (void*)all_transposed);
-    // 4. Coherent Summation
+    // 4. Coherent Summation + FFTShift + yakın mesafe supresyonu (i < 5)
     std::memset(ptroutput, 0, TOTAL_SIZE * sizeof(Complex));
-     #pragma omp parallel for
-    for (int n = 0; n < TOTAL_SIZE; ++n) {
-        float temp = 0.0f;
-        for (int ch = 0; ch < NUM_CHANNELS; ++ch) {
-            temp += std::norm(all_transposed[ch * TOTAL_SIZE + n]);
+    memset(sumVector, 0, TOTAL_SIZE * sizeof(float));
+    #pragma omp parallel for
+    for (int i = 0; i < NUM_SAMPLES; ++i)
+    {
+        // i < 5: yakın mesafe (DC sızıntısı) → atla
+        if (i < 5) continue;
+
+        for (int j = 0; j < NUM_CHIRPS; ++j)
+        {
+            float temp = 0.0f;
+            int in_idx = i * NUM_CHIRPS + j;
+
+            for (int ch = 0; ch < NUM_CHANNELS; ++ch)
+                temp += std::norm(all_transposed[ch * TOTAL_SIZE + in_idx]);
+
+            // FFTSHIFT: 0-Doppler'i merkeze kaydır
+            int shifted_j = (j + NUM_CHIRPS / 2) % NUM_CHIRPS;
+            sumVector[i * NUM_CHIRPS + shifted_j] = temp;
         }
-        sumVector[n] = temp;
     }
     auto end = std::chrono::high_resolution_clock::now();
     
@@ -170,6 +206,7 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
 
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     avxcfar.process(cfarData);
+    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_CHIRPS, NUM_SAMPLES);
     auto cfar_end = std::chrono::high_resolution_clock::now();
 
     fmcwCpuTime = std::chrono::duration<float, std::milli>(end - start).count();

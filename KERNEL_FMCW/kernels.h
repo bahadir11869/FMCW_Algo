@@ -3,6 +3,14 @@
 #include "../defines.h"
 
 // Kernel Prototipi (Gövdesi yok, sadece imzası)
+__global__ void sumChannelsShiftKernel(
+    const cuComplex* __restrict__ d_transposed_all,
+    float*           __restrict__ fpCfarData,
+    int numChannels,
+    int numSamples,
+    int numChirps
+);
+
 __global__ void transpose_optimized_kernel(cuComplex* input, cuComplex* output, int width, int height);
 __global__ void transpose_multi_channel_kernel(cuComplex* idata, cuComplex* odata, int width, int height); 
 __global__ void sumChannelsKernel(cuComplex* d_all_channels, float* d_output_sum, int num_channels, int channel_size);

@@ -18,14 +18,14 @@ namespace fs = std::filesystem;
 // sigma: I ve Q için std sapma (noise std)
 
 
-const int NUM_TX = 1;
-const int NUM_RX = 1;
+const int NUM_TX = 2;
+const int NUM_RX = 4;
 const int NUM_CHIRPS = 256;      // Slow Time (Y)
 const int NUM_SAMPLES = 128;     // Fast Time (X)
 const int REF_R = 8;
 const int REF_C = 8;
-const int GUARD_R = 2;
-const int GUARD_C = 2;
+const int GUARD_R = 6;
+const int GUARD_C = 10;
 const int NUM_CHANNELS = NUM_TX * NUM_RX; 
 const int TOTAL_SIZE = NUM_CHIRPS * NUM_SAMPLES;
 const int TOTAL_ELEMENTS = TOTAL_SIZE * NUM_TX * NUM_RX;
@@ -53,7 +53,7 @@ inline void addComplexAwgn(Complex& x, float sigma, std::mt19937& rng)
     x += Complex(nd(rng), nd(rng));
 }
 
-inline size_t idx(size_t r, size_t c, size_t C) { return r * C + c; }
+inline size_t idx(size_t r, size_t c, size_t cols) { return r * cols + c; }
 
 class CFARParams {
 public:
@@ -61,7 +61,7 @@ public:
     float snr_db = 10.0f;             // güç SNR (dB)
     int ref_r = REF_R, ref_c = REF_C;
     int guard_r = GUARD_R, guard_c = GUARD_C;
-    float pfa = 1e-6f;
+    float pfa = 1e-8f;
 };
 
 class CFARData {
@@ -159,9 +159,48 @@ inline void calculate_RMSE_Vectors(const std::vector<T>& cpu_vec,
     std::cout <<"RMSE : " << std::sqrt(total_sq_error / total_elements) << std::endl;
 }
 
+
+
+// CFAR tespitlerini hareketli ve durağan olarak ayırıp her grupta kendi içinde filtreler.
+// Böylece güçlü bir clutter (Doppler≈0) hareketli hedefleri bastıramaz.
+// rows = NUM_CHIRPS, cols = NUM_SAMPLES, harita fftshift sonrası [Doppler][Range] düzeninde.
+inline void applyPeakRelativeFilter(bool* detections, const float* power,
+                                     int rows, int cols,
+                                     int doppler_gate = 2,
+                                     float dB_threshold = 20.0f)
+{
+    int center = rows / 2;  // fftshift sonrası sıfır-Doppler satırı
+
+    float max_moving     = 0.0f;
+    float max_stationary = 0.0f;
+
+    for (int i = 0; i < rows * cols; ++i) {
+        if (!detections[i]) continue;
+        int dopp_offset = std::abs(i / cols - center);
+        if (dopp_offset > doppler_gate)
+            max_moving     = std::max(max_moving,     power[i]);
+        else
+            max_stationary = std::max(max_stationary, power[i]);
+    }
+
+    float factor       = std::pow(10.0f, dB_threshold / 10.0f);
+    float min_moving   = max_moving     / factor;
+    float min_static   = max_stationary / factor;
+
+    for (int i = 0; i < rows * cols; ++i) {
+        if (!detections[i]) continue;
+        int dopp_offset = std::abs(i / cols - center);
+        if (dopp_offset > doppler_gate) {
+            if (power[i] < min_moving)  detections[i] = false;
+        } else {
+            if (power[i] < min_static)  detections[i] = false;
+        }
+    }
+}
+
 inline void readBin(std::string binDosyasi, std::vector<Complex>& inputData)
 {
-    std::ifstream rf(binDosyasi, std::ios::out | std::ios::binary);
+    std::ifstream rf(binDosyasi, std::ios::in | std::ios::binary);
     if(!rf) 
         return;
     rf.read((char*)inputData.data(), inputData.size() * sizeof(Complex));

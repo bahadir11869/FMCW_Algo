@@ -57,10 +57,15 @@ gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
 
 gpu_fmcw::~gpu_fmcw()
 {
-    cudaFree(d_data);    
+    cudaFree(d_data);
     cudaFree(d_data_all);
     cudaFree(f_data);
+    cudaFree(d_transposed);
+    cudaFree(d_transposed_all);
+    cudaFree(fpCfarData);
+    cudaFree(bpCfarData);
     delete [] f_data_host;
+    delete [] bpCFAR;
     cudaEventDestroy(start_total);
     cudaEventDestroy(stop_total);
     cudaEventDestroy(start_fmcw_compute);
@@ -68,16 +73,15 @@ gpu_fmcw::~gpu_fmcw()
     cudaEventDestroy(start_cfar_compute);
     cudaEventDestroy(stop_cfar_compute);
 
-    for (int i = 0; i < 4; ++i) 
+    for (int i = 0; i < 4; ++i)
     {
         cudaStreamDestroy(streams[i]);
     }
 
     if(fftType == 1)
     {
-        cufftDestroy(planRange); 
+        cufftDestroy(planRange);
         cufftDestroy(planDoppler);
-        cudaFree(d_transposed);
     }
     else
     {
@@ -148,16 +152,18 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     
     k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_transposed_all, NUM_CHIRPS, log2_chirps);
 
-    int threadsSum = 256;
-    int blocksSum = (TOTAL_SIZE + threadsSum - 1) / threadsSum;
-    
-    // Daha önce yazdığımız toplama kernel'ı
-    //printf("Basladi 31\n");
-    sumChannelsKernel<<<blocksSum, threadsSum>>>(
-        d_transposed_all, 
-        fpCfarData, 
-        NUM_CHANNELS, 
-        TOTAL_SIZE
+    // Kanal toplama + FFTShift + yakın mesafe supresyonu (i < 5)
+    dim3 threadsSum(16, 16);
+    dim3 blocksSum(
+        (NUM_SAMPLES + threadsSum.x - 1) / threadsSum.x,
+        (NUM_CHIRPS  + threadsSum.y - 1) / threadsSum.y
+    );
+    sumChannelsShiftKernel<<<blocksSum, threadsSum>>>(
+        d_transposed_all,
+        fpCfarData,
+        NUM_CHANNELS,
+        NUM_SAMPLES,
+        NUM_CHIRPS
     );
   
     cudaEventRecord(stop_fmcw_compute);
@@ -201,10 +207,6 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
     cufftExecC2C(plan, d_data_all, d_data_all, CUFFT_FORWARD);
 
 
-    // 3. Veri Transferi (Device -> Host)
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (TOTAL_SIZE + threadsPerBlock - 1) / threadsPerBlock;
-
     dim3 threads(TILE_DIM, NUM_CHANNELS);
     // Grid'in Z boyutuna kanal sayısını ekliyoruz
     dim3 blocks((NUM_SAMPLES + TILE_DIM - 1) / TILE_DIM, 
@@ -214,8 +216,18 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
     // Not: Transpose kernel'ınızın içinde d_data_all + blockIdx.z * TOTAL_SIZE ofsetini kullanmalısınız
     transpose_multi_channel_kernel<<<blocks, threads>>>(d_data_all, d_transposed_all, NUM_SAMPLES, NUM_CHIRPS);
 
-    sumChannelsKernel<<<blocksPerGrid, threadsPerBlock>>>(
-        d_transposed_all, fpCfarData, NUM_CHANNELS, TOTAL_SIZE
+    // Kanal toplama + FFTShift + yakın mesafe supresyonu (i < 5)
+    dim3 threadsSum2D(16, 16);
+    dim3 blocksSum2D(
+        (NUM_SAMPLES + threadsSum2D.x - 1) / threadsSum2D.x,
+        (NUM_CHIRPS  + threadsSum2D.y - 1) / threadsSum2D.y
+    );
+    sumChannelsShiftKernel<<<blocksSum2D, threadsSum2D>>>(
+        d_transposed_all,
+        fpCfarData,
+        NUM_CHANNELS,
+        NUM_SAMPLES,
+        NUM_CHIRPS
     );
     cudaEventRecord(stop_fmcw_compute);
     cudaEventSynchronize(stop_fmcw_compute);
@@ -229,13 +241,10 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
     cudaEventSynchronize(stop_total);
 
     gpuErrchk(cudaMemcpy(ptroutput, fpCfarData, TOTAL_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
-    
 
 
     cudaEventElapsedTime(&fgpuComputeTime, start_fmcw_compute, stop_fmcw_compute);
     vfgpuComputeTime.push_back(fgpuComputeTime);
-
-    //gpuErrchk(cudaMemcpy(output.data(), d_transposed, TOTAL_SIZE * sizeof(cuComplex), cudaMemcpyDeviceToHost));
 
     // --- KRITIK BOLGE BITIS ---
     cudaEventElapsedTime(&fgpuTime, start_total, stop_total);
