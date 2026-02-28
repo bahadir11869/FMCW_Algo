@@ -2,6 +2,7 @@ import numpy as np
 import scipy.io
 from pathlib import Path
 import os
+import shutil
 
 NUM_SAMPLES = 128
 NUM_CHIRPS  = 256
@@ -11,13 +12,30 @@ NUM_CHIRPS  = 256
 hanning_range   = np.hanning(NUM_SAMPLES).astype(np.float32)   # (128,)
 hanning_doppler = np.hanning(NUM_CHIRPS).astype(np.float32)    # (256,)
 window_2d = np.outer(hanning_doppler, hanning_range)            # (256, 128)
+klasorIsmi = "2019_04_09_pms2000"
+klasor_yolu = klasorIsmi+"/radar_raw_frame"
+klasor_yolu_img = klasorIsmi+"/images_0"
+output_dir  = "../radar_raw_frame/bin_files"
+output_image_dir  = "../radar_raw_frame/images"
 
-klasor_yolu = "radarDeneme"
-mat_isimleri = [f for f in os.listdir(klasor_yolu) if f.endswith('.mat')]
+if os.path.exists(output_dir):
+    shutil.rmtree(output_dir)
+if os.path.exists(output_image_dir):
+    shutil.rmtree(output_image_dir)
 
-for dosya in mat_isimleri:
-    binName      = "radar_raw_frameBinDeneme/" + dosya.split('.')[0]
-    matDosyalari = "radarDeneme/" + dosya
+os.makedirs(output_dir, exist_ok=True)
+os.makedirs(output_image_dir, exist_ok=True)
+
+mat_isimleri    = sorted([f for f in os.listdir(klasor_yolu)     if f.endswith('.mat')])
+images_isimleri = sorted([f for f in os.listdir(klasor_yolu_img) if f.endswith('.jpg')])
+
+for dosya, image in zip(mat_isimleri, images_isimleri):
+    binName      = output_dir + "/" + dosya.split('.')[0]
+    matDosyalari = klasor_yolu + "/" + dosya
+
+    # Resmi hedef klasore kopyala
+    shutil.copy(os.path.join(klasor_yolu_img, image), os.path.join(output_image_dir, dosya.split('.')[0]+".jpg"))
+    
 
     data     = scipy.io.loadmat(matDosyalari)
     adc_data = data['adcData']  # Orijinal: (128, 255, 4, 2)
@@ -40,5 +58,3 @@ for dosya in mat_isimleri:
     # Binary olarak kaydet
     with open(binName + '.bin', 'wb') as f:
         f.write(converted_data.tobytes())
-
-    print(f"[OK] {dosya} → {binName}.bin | shape: {converted_data.shape}")

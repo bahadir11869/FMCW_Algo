@@ -26,12 +26,12 @@ int main()
     gpuErrchk(cudaMallocHost((void**)&h_pinned_outputGPU, TOTAL_SIZE * sizeof(float)));
     std::vector<float> detectionMap(TOTAL_SIZE);
 
-    readBin("radar_raw_frameBin/000357.bin", fullData);
+    readBin("radar_raw_frame/bin_files/000513.bin", fullData);
     //veriUret(fullData, s1);
 
     int iTekrarSayisi = 10;
 
-    gpu_fmcw gpuManuelSHM(1,"GPU_FMCW/gpu_Manuel_FFT_Shared.txt");
+    gpu_fmcw gpuManuelSHM(1);
     for(int i = 0; i < iTekrarSayisi; i++)
     {
         gpuManuelSHM.run_gpu_manuel_FFT_Shared_Mem(fullData, h_pinned_outputGPU);        
@@ -40,7 +40,7 @@ int main()
 
 
     memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
-    gpu_fmcw gpu2DFFT(2,"GPU_FMCW/2DFFT.txt");
+    gpu_fmcw gpu2DFFT(2);
 
     for(int i = 0; i < iTekrarSayisi; i++)
     {
@@ -63,7 +63,7 @@ int main()
     save_rdm_data("GPU_FMCW/FFT_ManuelSHM.csv", gpuManuelSHM.getOutput(), true);
 
 
-    cpu_fmcw cpuFMCWManuel("CPU_FMCW/cpu_Recursive.txt");
+    cpu_fmcw cpuFMCWManuel;
     cpuFMCWManuel.run_cpu_basic(fullData);                
 
 
@@ -74,7 +74,7 @@ int main()
     save_rdm_data("CPU_FMCW/FFT_CPU.csv", cpuFMCWManuel.getOutput(), true);
 
     
-    cpu_fmcw cpuFMCWAVX("CPU_FMCW/cpu_AVX.txt");
+    cpu_fmcw cpuFMCWAVX;
     memcpy(h_pinned_input, fullData.data(), TOTAL_ELEMENTS * sizeof(Complex));
     cpuFMCWAVX.run_cpu_avx(h_pinned_input, h_pinned_outputCPU);
     

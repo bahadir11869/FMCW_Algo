@@ -2,13 +2,8 @@
 #include <omp.h>
 
 
-CFARParams p;
-CPUCFAR cpu_sat(p);
-AVXCFAR avxcfar(p);
-
-cpu_fmcw::cpu_fmcw(std::string strDosyaAdi)
+cpu_fmcw::cpu_fmcw() : cpu_sat(p), avxcfar(p)
 {
-    this->strDosyaAdi = strDosyaAdi;
     fmcwCpuTime = 0.0f;
     cfarCpuTime =0.0f;
     vfcpuTime = {};
@@ -147,8 +142,8 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
     auto cfar = std::chrono::high_resolution_clock::now(); 
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     cpu_sat.process(cfarData);
-    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_SAMPLES, NUM_CHIRPS);
     auto cfar_end = std::chrono::high_resolution_clock::now();
+    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_SAMPLES, NUM_CHIRPS);
 
     fmcwCpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     cfarCpuTime =  std::chrono::duration<float, std::milli>(cfar_end - cfar).count();
@@ -206,8 +201,8 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
 
     cfarData.power = std::vector<float>(sumVector, sumVector + TOTAL_SIZE);
     avxcfar.process(cfarData);
-    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_SAMPLES, NUM_CHIRPS);
     auto cfar_end = std::chrono::high_resolution_clock::now();
+    applyPeakRelativeFilter(cfarData.truth, cfarData.power.data(), NUM_SAMPLES, NUM_CHIRPS);
 
     fmcwCpuTime = std::chrono::duration<float, std::milli>(end - start).count();
     cfarCpuTime =  std::chrono::duration<float, std::milli>(cfar_end - cfar).count();
@@ -228,6 +223,16 @@ float cpu_fmcw::getCpuTime()
     return fSum/vfcpuTime.size();
 }
 
+float cpu_fmcw::getCpuTimeTotal()
+{
+    float fSum = 0.0f;
+    for(size_t i = 0; i < vfcpuTime.size(); ++i)
+    {
+        fSum += vfcpuTime[i] + vCfarCpuTime[i];
+    }
+    return fSum;
+}
+
 float cpu_fmcw::getCfarCpuTime()
 {
     float fSum = 0.0f;
@@ -236,12 +241,6 @@ float cpu_fmcw::getCfarCpuTime()
         fSum += i;
     }
     return fSum/vCfarCpuTime.size();
-}
-
-
-std::string cpu_fmcw::getFileName()
-{
-    return strDosyaAdi;
 }
 
 float* cpu_fmcw::getOutput()

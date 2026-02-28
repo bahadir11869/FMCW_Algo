@@ -10,8 +10,6 @@ private:
     float fgpuComputeTime;
     float cfarComputeTime;
 
-    std::string strDosyaAdi;
-
     std::vector<float> vfgpuTime;
     std::vector<float> vfgpuComputeTime;
     std::vector<float> vfCfargpuTime;
@@ -48,7 +46,7 @@ public:
     CFARData cfarData;
     CFARParams cfarParam;
     GPUCFAR_SAT cfarProcessor;
-    gpu_fmcw(int fftType, std::string strDosyaAdi);
+    gpu_fmcw(int fftType);
     ~gpu_fmcw();
     void run_gpu_manuel_transpose(std::vector<Complex>& input);
     void run_gpu_manuel_FFT_Shared_Yok(std::vector<Complex>& input);
@@ -57,9 +55,9 @@ public:
     void run_gpu_streams(Complex* h_input, Complex* h_output);
 
     float getGpuTime();
+    float getGpuTimeTotal();
     float getGpuComputeTime();
     float getCfarGpuComputeTime();
-    std::string getDosyaAdi();
     float* getOutput();
 
 

@@ -2,9 +2,8 @@
 #include "../KERNEL_FMCW/kernels.h"
 
 
-gpu_fmcw::gpu_fmcw(int fftType, std::string strDosyaAdi)
+gpu_fmcw::gpu_fmcw(int fftType)
 {
-    this->strDosyaAdi = strDosyaAdi;
     vfgpuTime = {};
     vfgpuComputeTime = {};
     cudaEventCreate(&start_total);
@@ -267,6 +266,17 @@ float gpu_fmcw::getGpuTime()
     }
     return fSum / vfgpuTime.size();
 }
+
+float gpu_fmcw::getGpuTimeTotal()
+{
+    float fSum = 0.0f;
+    for(auto i: vfgpuTime)
+    {
+        fSum += i;
+    }
+    return fSum;
+}
+
 float gpu_fmcw::getGpuComputeTime()
 {
     float fSum = 0.0f;
@@ -284,11 +294,6 @@ float gpu_fmcw::getCfarGpuComputeTime()
         fSum += i;
     }
     return fSum / vfCfargpuTime.size();
-}
-
-std::string gpu_fmcw::getDosyaAdi()
-{
-    return strDosyaAdi;
 }
 
 

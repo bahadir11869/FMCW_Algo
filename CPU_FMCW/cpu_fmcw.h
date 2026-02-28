@@ -13,25 +13,26 @@ private:
 
     std::vector<float> vfcpuTime;
     std::vector<float> vCfarCpuTime;
-    std::string strDosyaAdi;
     std::vector<Complex> output;
     DFTI_DESCRIPTOR_HANDLE handRange;
     DFTI_DESCRIPTOR_HANDLE handDoppler;
     Complex* all_transposed;
     float* sumVector;
+    CFARParams p;
+    CPUCFAR cpu_sat;
+    AVXCFAR avxcfar;
 
 
 public:
     CFARData cfarData;
-    cpu_fmcw(std::string strDosyaAdi);
+    cpu_fmcw();
     ~cpu_fmcw();
     void run_cpu_basic(const std::vector<Complex>& input);
     void run_cpu_openmp(const std::vector<Complex>& input);
     void run_cpu_avx(Complex* input, Complex* ptroutput);
 
     float getCpuTime();
+    float getCpuTimeTotal();
     float getCfarCpuTime();
-    std::string getFileName();
     float* getOutput();
 };
-
