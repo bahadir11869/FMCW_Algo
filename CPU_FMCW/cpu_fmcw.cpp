@@ -109,13 +109,11 @@ void cpu_fmcw::run_cpu_basic(const std::vector<Complex>& input)
                 row[j] = transposed[i * NUM_CHIRPS + j];
             }
             
-            /*
-            // DÜZELTME 1: MTI (Mean Subtraction) - Statik kargaşayı sil
+            // MTI: Doppler FFT öncesi chirp ortalamasını çıkar (statik clutter baskılama)
             Complex mean_val(0.0f, 0.0f);
             for(int j = 0; j < NUM_CHIRPS; ++j) mean_val += row[j];
             mean_val /= (float)NUM_CHIRPS;
             for(int j = 0; j < NUM_CHIRPS; ++j) row[j] -= mean_val;
-            */
 
             cpu_recursive_fft(row);
 
@@ -171,7 +169,21 @@ void cpu_fmcw::run_cpu_avx(Complex* input, Complex* ptroutput)
         }
     }
 
-    // 3. Doppler FFT
+    // 3. MTI: Doppler FFT öncesi her (kanal, range_bin) için chirp ortalamasını çıkar
+    #pragma omp parallel for collapse(2)
+    for (int ch = 0; ch < NUM_CHANNELS; ++ch) {
+        for (int i = 0; i < NUM_SAMPLES; ++i) {
+            int base = ch * TOTAL_SIZE + i * NUM_CHIRPS;
+            Complex mean_val(0.0f, 0.0f);
+            for (int j = 0; j < NUM_CHIRPS; ++j)
+                mean_val += all_transposed[base + j];
+            mean_val /= (float)NUM_CHIRPS;
+            for (int j = 0; j < NUM_CHIRPS; ++j)
+                all_transposed[base + j] -= mean_val;
+        }
+    }
+
+    // 4. Doppler FFT
     DftiComputeForward(handDoppler, (void*)all_transposed);
     // 4. Coherent Summation + FFTShift + yakın mesafe supresyonu (i < 5)
     std::memset(ptroutput, 0, TOTAL_SIZE * sizeof(Complex));

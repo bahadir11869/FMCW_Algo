@@ -156,7 +156,71 @@ __global__ void sumChannelsShiftKernel(
     fpCfarData[i * numChirps + shifted_j] = power;
 }
 
-__global__ void k_fft_shared(cuComplex* d_data, int n, int log2_n) 
+// MTI: Transpose sonrası veri düzeni [ch * TOTAL_SIZE + sample * numChirps + chirp]
+// blockIdx.x = ch * numSamples + sample, threadIdx.x = chirp (koaliseli erişim)
+__global__ void k_mti_mean_subtract(cuComplex* data, int numSamples, int numChirps)
+{
+    int block_id = blockIdx.x;   // ch * numSamples + range_bin
+    int tid      = threadIdx.x;  // chirp indeksi
+    if (tid >= numChirps) return;
+
+    int base = block_id * numChirps;
+
+    __shared__ cuComplex s_data[NUM_CHIRPS];
+    __shared__ float     s_sumR[NUM_CHIRPS];
+    __shared__ float     s_sumI[NUM_CHIRPS];
+
+    s_data[tid] = data[base + tid];
+    s_sumR[tid] = s_data[tid].x;
+    s_sumI[tid] = s_data[tid].y;
+    __syncthreads();
+
+    for (int stride = numChirps >> 1; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            s_sumR[tid] += s_sumR[tid + stride];
+            s_sumI[tid] += s_sumI[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    float inv_n = 1.0f / (float)numChirps;
+    cuComplex mean = make_cuComplex(s_sumR[0] * inv_n, s_sumI[0] * inv_n);
+    data[base + tid] = make_cuComplex(s_data[tid].x - mean.x, s_data[tid].y - mean.y);
+}
+
+// MTI: Ham veri düzeni [ch * TOTAL_SIZE + chirp * numSamples + sample]
+// blockIdx.x = ch * numSamples + sample, threadIdx.x = chirp
+__global__ void k_mti_mean_subtract_2dfft(cuComplex* data, int numSamples, int numChirps)
+{
+    int block_id = blockIdx.x;         // ch * numSamples + j
+    int ch = block_id / numSamples;
+    int j  = block_id % numSamples;    // range sample indeksi
+    int tid = threadIdx.x;             // chirp indeksi
+    if (tid >= numChirps) return;
+
+    int idx = ch * numSamples * numChirps + tid * numSamples + j;
+    cuComplex val = data[idx];
+
+    __shared__ float s_sumR[NUM_CHIRPS];
+    __shared__ float s_sumI[NUM_CHIRPS];
+    s_sumR[tid] = val.x;
+    s_sumI[tid] = val.y;
+    __syncthreads();
+
+    for (int stride = numChirps >> 1; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            s_sumR[tid] += s_sumR[tid + stride];
+            s_sumI[tid] += s_sumI[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    float inv_n = 1.0f / (float)numChirps;
+    cuComplex mean = make_cuComplex(s_sumR[0] * inv_n, s_sumI[0] * inv_n);
+    data[idx] = make_cuComplex(val.x - mean.x, val.y - mean.y);
+}
+
+__global__ void k_fft_shared(cuComplex* d_data, int n, int log2_n)
 {
     extern __shared__ cuComplex s_data[];
 

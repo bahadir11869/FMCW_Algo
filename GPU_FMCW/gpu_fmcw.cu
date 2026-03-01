@@ -149,6 +149,9 @@ void gpu_fmcw::run_gpu_manuel_FFT_Shared_Mem(std::vector<Complex>& input, float*
     // Ama kernel d_data üzerinde çalışsın istiyorsak parametreleri değiştirebiliriz.
     // Basitlik için d_transposed üzerinde yapıp sonucu ordan alalım.
     
+    // MTI: Doppler FFT öncesi her (kanal, range_bin) için chirp ortalamasını çıkar
+    k_mti_mean_subtract<<<NUM_CHANNELS * NUM_SAMPLES, NUM_CHIRPS>>>(d_transposed_all, NUM_SAMPLES, NUM_CHIRPS);
+
     k_fft_shared<<<numBlocks, threadsPerBlock, sharedMemSize>>>(d_transposed_all, NUM_CHIRPS, log2_chirps);
 
     // Kanal toplama + FFTShift + yakın mesafe supresyonu (i < 5)
@@ -200,7 +203,10 @@ void gpu_fmcw::run_gpu_2DFFT(Complex* input, float* ptroutput)
     // 1. Veri Transferi (Host -> Device)
     // Pinned memory olduğu için çok daha hızlıdır.
     gpuErrchk(cudaMemcpy(d_data_all, input, sizeBytes, cudaMemcpyHostToDevice));
-    
+
+    // MTI: 2D FFT öncesi ham veriden chirp ortalamasını çıkar (statik clutter baskılama)
+    k_mti_mean_subtract_2dfft<<<NUM_CHANNELS * NUM_SAMPLES, NUM_CHIRPS>>>(d_data_all, NUM_SAMPLES, NUM_CHIRPS);
+
     cudaEventRecord(start_fmcw_compute);
     // 2. 2D FFT (Hem Range hem Doppler işlemini ve Transpose mantığını içerir)
     cufftExecC2C(plan, d_data_all, d_data_all, CUFFT_FORWARD);

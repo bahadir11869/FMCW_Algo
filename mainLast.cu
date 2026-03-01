@@ -26,7 +26,7 @@ int main()
     gpuErrchk(cudaMallocHost((void**)&h_pinned_outputGPU, TOTAL_SIZE * sizeof(float)));
     std::vector<float> detectionMap(TOTAL_SIZE);
 
-    readBin("radar_raw_frame/bin_files/000513.bin", fullData);
+    readBin("radar_raw_frame/bin_files/000002.bin", fullData);
     //veriUret(fullData, s1);
 
     int iTekrarSayisi = 10;

@@ -6,4 +6,7 @@ GPU_FMCW
 *png
 *jpg
 *jpeg
+*.csv
+*.mat
+*.bin
 radar_raw_frameBin

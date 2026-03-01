@@ -54,9 +54,14 @@ def plot_in_new_window(title_prefix, power_map, mask_map):
     range_extent = [0, NUM_SAMPLES]
     img_extent = [range_extent[0], range_extent[1], doppler_extent[0], doppler_extent[1]]
 
+    # 40 dB dinamik aralık: tepe noktasından 40 dB aşağısına kadar göster
+    vmax = np.nanmax(power_db)
+    vmin = vmax - 40
+
     # 1. Subplot: Sadece RDM
     ax1 = fig.add_subplot(1, 2, 1)
-    im = ax1.imshow(power_db, aspect='auto', cmap='jet', origin='lower', extent=img_extent)
+    im = ax1.imshow(power_db, aspect='auto', cmap='jet', origin='lower', extent=img_extent,
+                    vmin=vmin, vmax=vmax)
     ax1.set_title(f"{title_prefix} | Range-Doppler (dB)")
     ax1.set_xlabel("Range (Sample / Mesafe)")
     ax1.set_ylabel("Doppler (Chirp / Hız)")
@@ -64,7 +69,8 @@ def plot_in_new_window(title_prefix, power_map, mask_map):
 
     # 2. Subplot: RDM üzerinde CFAR Hedefleri
     ax2 = fig.add_subplot(1, 2, 2)
-    ax2.imshow(power_db, aspect='auto', cmap='gray', origin='lower', alpha=0.5, extent=img_extent)
+    ax2.imshow(power_db, aspect='auto', cmap='gray', origin='lower', alpha=0.5, extent=img_extent,
+               vmin=vmin, vmax=vmax)
     ax2.set_title(f"{title_prefix} | CFAR Mask Tespitleri")
     ax2.set_xlabel("Range (Sample / Mesafe)")
     ax2.set_ylabel("Doppler (Chirp / Hız)")
